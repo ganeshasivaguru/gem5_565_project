@@ -41,6 +41,7 @@
 
 #include "cpu/minor/decode.hh"
 #include "cpu/minor/execute.hh"
+#include "cpu/minor/execute_dummy.hh"
 #include "cpu/minor/fetch1.hh"
 #include "cpu/minor/fetch2.hh"
 #include "debug/Drain.hh"
@@ -65,14 +66,18 @@ Pipeline::Pipeline(MinorCPU &cpu_, const BaseMinorCPUParams &params) :
         params.fetch1ToFetch2BackwardDelay, true),
     f2ToD(cpu.name() + ".f2ToD", "insts",
         params.fetch2ToDecodeForwardDelay),
-    dToE(cpu.name() + ".dToE", "insts",
+    dToE1(cpu.name() + ".dToE1", "insts",
+        params.decodeToExecuteForwardDelay),
+    e1ToE(cpu.name() + ".e1ToE", "insts",
         params.decodeToExecuteForwardDelay),
     eToF1(cpu.name() + ".eToF1", "branch",
         params.executeBranchDelay),
     execute(cpu.name() + ".execute", cpu, params,
-        dToE.output(), eToF1.input()),
+        e1ToE.output(), eToF1.input()),
+    execute_dummy(cpu.name() + ".execute_dummy", cpu, params,
+        dToE1.output(), e1ToE.input(),execute.inputBuffer),
     decode(cpu.name() + ".decode", cpu, params,
-        f2ToD.output(), dToE.input(), execute.inputBuffer),
+        f2ToD.output(), dToE1.input(), execute_dummy.inputBuffer),
     fetch2(cpu.name() + ".fetch2", cpu, params,
         f1ToF2.output(), eToF1.output(), f2ToF1.input(), f2ToD.input(),
         decode.inputBuffer),
@@ -116,7 +121,10 @@ Pipeline::minorTrace() const
     fetch2.minorTrace();
     f2ToD.minorTrace();
     decode.minorTrace();
-    dToE.minorTrace();
+    dToE1.minorTrace();
+    //Revisit if I need to add minorTrace for the dummy execute state : GVS
+    //execute_dummy.minorTrace();
+    e1ToE.minorTrace();
     execute.minorTrace();
     eToF1.minorTrace();
     activityRecorder.minorTrace();
@@ -132,6 +140,7 @@ Pipeline::evaluate()
      *  'immediate', 0-time-offset TimeBuffer activity to be visible from
      *  later stages to earlier ones in the same cycle */
     execute.evaluate();
+    execute_dummy.evaluate();
     decode.evaluate();
     fetch2.evaluate();
     fetch1.evaluate();
@@ -143,7 +152,8 @@ Pipeline::evaluate()
     f1ToF2.evaluate();
     f2ToF1.evaluate();
     f2ToD.evaluate();
-    dToE.evaluate();
+    dToE1.evaluate();
+    e1ToE.evaluate();
     eToF1.evaluate();
 
     /* The activity recorder must be be called after all the stages and
@@ -165,6 +175,7 @@ Pipeline::evaluate()
         activityRecorder.deactivateStage(Pipeline::Fetch1StageId);
         activityRecorder.deactivateStage(Pipeline::Fetch2StageId);
         activityRecorder.deactivateStage(Pipeline::DecodeStageId);
+        activityRecorder.deactivateStage(Pipeline::ExecuteDummyStageId);
         activityRecorder.deactivateStage(Pipeline::ExecuteStageId);
     }
 
@@ -232,17 +243,22 @@ Pipeline::isDrained()
     bool fetch1_drained = fetch1.isDrained();
     bool fetch2_drained = fetch2.isDrained();
     bool decode_drained = decode.isDrained();
+    //Revisit what this function should be : GVS
+    bool execute_dummy_drained = execute_dummy.isDrained();
     bool execute_drained = execute.isDrained();
 
     bool f1_to_f2_drained = f1ToF2.empty();
     bool f2_to_f1_drained = f2ToF1.empty();
     bool f2_to_d_drained = f2ToD.empty();
-    bool d_to_e_drained = dToE.empty();
+
+    bool d_to_ed_drained = dToE1.empty();
+    bool ed_to_e_drained = e1ToE.empty();
+
 
     bool ret = fetch1_drained && fetch2_drained &&
-        decode_drained && execute_drained &&
+        decode_drained && execute_dummy_drained &&execute_drained &&
         f1_to_f2_drained && f2_to_f1_drained &&
-        f2_to_d_drained && d_to_e_drained;
+        f2_to_d_drained && d_to_ed_drained && ed_to_e_drained;
 
     DPRINTF(MinorCPU, "Pipeline undrained stages state:%s%s%s%s%s%s%s%s\n",
         (fetch1_drained ? "" : " Fetch1"),
@@ -252,7 +268,8 @@ Pipeline::isDrained()
         (f1_to_f2_drained ? "" : " F1->F2"),
         (f2_to_f1_drained ? "" : " F2->F1"),
         (f2_to_d_drained ? "" : " F2->D"),
-        (d_to_e_drained ? "" : " D->E")
+        (d_to_ed_drained ? "" : " D->E1"),
+        (ed_to_e_drained ? "" : "ED->E")
         );
 
     return ret;

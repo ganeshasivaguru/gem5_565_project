@@ -217,7 +217,7 @@ class BaseMinorCPU(BaseCPU):
         "Backward cycle delay from Fetch2 to Fetch1 for branch prediction"
         " signalling (0 means in the same cycle, 1 mean the next cycle)")
 
-    fetch2InputBufferSize = Param.Unsigned(2,
+    fetch2InputBufferSize = Param.Unsigned(1,
         "Size of input buffer to Fetch2 in cycles-worth of insts.")
     fetch2ToDecodeForwardDelay = Param.Cycles(1,
         "Forward cycle delay from Fetch2 to Decode (1 means next cycle)")
@@ -225,18 +225,18 @@ class BaseMinorCPU(BaseCPU):
         "Allow Fetch2 to cross input lines to generate full output each"
         " cycle")
 
-    decodeInputBufferSize = Param.Unsigned(3,
+    decodeInputBufferSize = Param.Unsigned(1,
         "Size of input buffer to Decode in cycles-worth of insts.")
     decodeToExecuteForwardDelay = Param.Cycles(1,
         "Forward cycle delay from Decode to Execute (1 means next cycle)")
-    decodeInputWidth = Param.Unsigned(2,
+    decodeInputWidth = Param.Unsigned(1,
         "Width (in instructions) of input to Decode (and implicitly"
         " Decode's own width)")
     decodeCycleInput = Param.Bool(True,
         "Allow Decode to pack instructions from more than one input cycle"
         " to fill its output each cycle")
 
-    executeInputWidth = Param.Unsigned(2,
+    executeInputWidth = Param.Unsigned(1,
         "Width (in instructions) of input to Execute")
     executeCycleInput = Param.Bool(True,
         "Allow Execute to use instructions from more than one input cycle"
@@ -249,7 +249,7 @@ class BaseMinorCPU(BaseCPU):
         "Number of committable instructions in Execute each cycle")
     executeMemoryCommitLimit = Param.Unsigned(1,
         "Number of committable memory references in Execute each cycle")
-    executeInputBufferSize = Param.Unsigned(7,
+    executeInputBufferSize = Param.Unsigned(1,
         "Size of input buffer to Execute in cycles-worth of insts.")
     executeMemoryWidth = Param.Unsigned(0,
         "Width (and snap) in bytes of the data memory interface. (0 mean use"
