@@ -1,0 +1,235 @@
+diff --git a/src/arch/arm/ArmCPU.py b/src/arch/arm/ArmCPU.py
+index c55d99b..d446a6c 100644
+--- a/src/arch/arm/ArmCPU.py
++++ b/src/arch/arm/ArmCPU.py
+@@ -35,6 +35,11 @@ from m5.objects.ArmDecoder import ArmDecoder
+ from m5.objects.ArmMMU import ArmMMU
+ from m5.objects.ArmInterrupts import ArmInterrupts
+ from m5.objects.ArmISA import ArmISA
++from m5.objects.BaseMinorCPU import MinorDefaultFloatSimdFU
++from m5.objects.BaseMinorCPU import MinorFUPool
++from m5.objects.BaseMinorCPU import MinorDefaultIntFU, MinorDefaultIntFU
++from m5.objects.BaseMinorCPU import MinorDefaultIntMulFU, MinorDefaultIntDivFU
++from m5.objects.BaseMinorCPU import MinorDefaultMemFU, MinorDefaultMiscFU
+ 
+ class ArmCPU:
+     ArchDecoder = ArmDecoder
+@@ -76,3 +81,45 @@ class ArmO3CPU(BaseO3CPU, ArmCPU):
+ 
+ class ArmMinorCPU(BaseMinorCPU, ArmCPU):
+     mmu = ArmMMU()
++
++
++
++class MyFloatSIMDFU(MinorDefaultFloatSimdFU):
++
++# From MinorDefaultFloatSimdFU
++# opLat = 6
++
++# From MinorFU
++# issueLat = 1
++
++    def __init__(self, options=None):
++        super(MinorDefaultFloatSimdFU, self).__init__()
++
++        if options and options.fpu_operation_latency:
++            #self.opLat = options.fpu_operation_latency
++            self.opLat = 4 
++
++        if  options and options.fpu_issue_latency:
++            #self.issueLat = 7 - options.fpu_operation_latency
++            self.issueLat = 3
++
++
++class MyFUPool(MinorFUPool):
++    def __init__(self, options=None):
++        super(MinorFUPool, self).__init__()
++        # Copied from src/mem/MinorCPU.py
++        self.funcUnits = [MinorDefaultIntFU(), MinorDefaultIntFU(),
++                        MinorDefaultIntMulFU(), MinorDefaultIntDivFU(),
++                        MinorDefaultMemFU(), MinorDefaultMiscFU(),
++                        # My FPU
++                        MyFloatSIMDFU(options)]
++
++
++class MyMinorCPU(BaseMinorCPU,ArmCPU):
++    mmu = ArmMMU()
++    def __init__(self, cpu_id, options=None):
++        self.cpu_id = cpu_id;
++        super(BaseMinorCPU,self).__init__()
++        #print(options.fpu_operation_latency)
++        self.executeFuncUnits = MyFUPool(options)
++
+diff --git a/src/arch/arm/SConscript b/src/arch/arm/SConscript
+index bc720d1..5d50be3 100644
+--- a/src/arch/arm/SConscript
++++ b/src/arch/arm/SConscript
+@@ -126,6 +126,7 @@ SimObject('NonCachingSimpleCPU.py', sim_objects=[], tags='arm isa')
+ SimObject('O3CPU.py', sim_objects=[], tags='arm isa')
+ SimObject('O3Checker.py', sim_objects=[], tags='arm isa')
+ SimObject('MinorCPU.py', sim_objects=[], tags='arm isa')
++SimObject('MyMinorCPU.py', sim_objects=[], tags='arm isa')
+ 
+ DebugFlag('Arm', tags='arm isa')
+ DebugFlag('ArmTme', 'Transactional Memory Extension', tags='arm isa')
+diff --git a/src/cpu/minor/SConscript b/src/cpu/minor/SConscript
+index cd1b8e3..8bdc654 100644
+--- a/src/cpu/minor/SConscript
++++ b/src/cpu/minor/SConscript
+@@ -51,6 +51,7 @@ if env['CONF']['TARGET_ISA'] != 'null':
+     Source('decode.cc')
+     Source('dyn_inst.cc')
+     Source('execute.cc')
++    Source('execute_dummy.cc')
+     Source('fetch1.cc')
+     Source('fetch2.cc')
+     Source('func_unit.cc')
+diff --git a/src/cpu/minor/pipeline.cc b/src/cpu/minor/pipeline.cc
+index e94181f..607fd2c 100644
+--- a/src/cpu/minor/pipeline.cc
++++ b/src/cpu/minor/pipeline.cc
+@@ -47,6 +47,7 @@
+ #include "debug/MinorCPU.hh"
+ #include "debug/MinorTrace.hh"
+ #include "debug/Quiesce.hh"
++#include "cpu/minor/execute_dummy.hh"
+ 
+ namespace gem5
+ {
+@@ -65,14 +66,18 @@ Pipeline::Pipeline(MinorCPU &cpu_, const BaseMinorCPUParams &params) :
+         params.fetch1ToFetch2BackwardDelay, true),
+     f2ToD(cpu.name() + ".f2ToD", "insts",
+         params.fetch2ToDecodeForwardDelay),
+-    dToE(cpu.name() + ".dToE", "insts",
++    dToE1(cpu.name() + ".dToE1", "insts",
++        params.decodeToExecuteForwardDelay),
++    e1ToE(cpu.name() + ".e1ToE", "insts",
+         params.decodeToExecuteForwardDelay),
+     eToF1(cpu.name() + ".eToF1", "branch",
+         params.executeBranchDelay),
+     execute(cpu.name() + ".execute", cpu, params,
+-        dToE.output(), eToF1.input()),
++        e1ToE.output(), eToF1.input()),
++    execute_dummy(cpu.name() + ".execute_dummy", cpu, params,
++        dToE1.output(), e1ToE.input(),execute.inputBuffer), 
+     decode(cpu.name() + ".decode", cpu, params,
+-        f2ToD.output(), dToE.input(), execute.inputBuffer),
++        f2ToD.output(), dToE1.input(), execute_dummy.inputBuffer),
+     fetch2(cpu.name() + ".fetch2", cpu, params,
+         f1ToF2.output(), eToF1.output(), f2ToF1.input(), f2ToD.input(),
+         decode.inputBuffer),
+@@ -116,7 +121,10 @@ Pipeline::minorTrace() const
+     fetch2.minorTrace();
+     f2ToD.minorTrace();
+     decode.minorTrace();
+-    dToE.minorTrace();
++    dToE1.minorTrace();
++    //Revisit if I need to add minorTrace for the dummy execute state : GVS
++    //execute_dummy.minorTrace();
++    e1ToE.minorTrace();
+     execute.minorTrace();
+     eToF1.minorTrace();
+     activityRecorder.minorTrace();
+@@ -132,6 +140,7 @@ Pipeline::evaluate()
+      *  'immediate', 0-time-offset TimeBuffer activity to be visible from
+      *  later stages to earlier ones in the same cycle */
+     execute.evaluate();
++    execute_dummy.evaluate();
+     decode.evaluate();
+     fetch2.evaluate();
+     fetch1.evaluate();
+@@ -143,7 +152,8 @@ Pipeline::evaluate()
+     f1ToF2.evaluate();
+     f2ToF1.evaluate();
+     f2ToD.evaluate();
+-    dToE.evaluate();
++    dToE1.evaluate();
++    e1ToE.evaluate();
+     eToF1.evaluate();
+ 
+     /* The activity recorder must be be called after all the stages and
+@@ -165,6 +175,7 @@ Pipeline::evaluate()
+         activityRecorder.deactivateStage(Pipeline::Fetch1StageId);
+         activityRecorder.deactivateStage(Pipeline::Fetch2StageId);
+         activityRecorder.deactivateStage(Pipeline::DecodeStageId);
++        activityRecorder.deactivateStage(Pipeline::ExecuteDummyStageId);
+         activityRecorder.deactivateStage(Pipeline::ExecuteStageId);
+     }
+ 
+@@ -232,17 +243,22 @@ Pipeline::isDrained()
+     bool fetch1_drained = fetch1.isDrained();
+     bool fetch2_drained = fetch2.isDrained();
+     bool decode_drained = decode.isDrained();
++    //Revisit what this function should be : GVS
++    bool execute_dummy_drained = execute_dummy.isDrained();
+     bool execute_drained = execute.isDrained();
+ 
+     bool f1_to_f2_drained = f1ToF2.empty();
+     bool f2_to_f1_drained = f2ToF1.empty();
+     bool f2_to_d_drained = f2ToD.empty();
+-    bool d_to_e_drained = dToE.empty();
++
++    bool d_to_ed_drained = dToE1.empty();
++    bool ed_to_e_drained = e1ToE.empty();
++
+ 
+     bool ret = fetch1_drained && fetch2_drained &&
+-        decode_drained && execute_drained &&
++        decode_drained && execute_dummy_drained &&execute_drained &&
+         f1_to_f2_drained && f2_to_f1_drained &&
+-        f2_to_d_drained && d_to_e_drained;
++        f2_to_d_drained && d_to_ed_drained && ed_to_e_drained;
+ 
+     DPRINTF(MinorCPU, "Pipeline undrained stages state:%s%s%s%s%s%s%s%s\n",
+         (fetch1_drained ? "" : " Fetch1"),
+@@ -252,7 +268,8 @@ Pipeline::isDrained()
+         (f1_to_f2_drained ? "" : " F1->F2"),
+         (f2_to_f1_drained ? "" : " F2->F1"),
+         (f2_to_d_drained ? "" : " F2->D"),
+-        (d_to_e_drained ? "" : " D->E")
++        (d_to_ed_drained ? "" : " D->E1"),
++        (ed_to_e_drained ? "" : "ED->E")
+         );
+ 
+     return ret;
+diff --git a/src/cpu/minor/pipeline.hh b/src/cpu/minor/pipeline.hh
+index ce0ae07..434644e 100644
+--- a/src/cpu/minor/pipeline.hh
++++ b/src/cpu/minor/pipeline.hh
+@@ -53,6 +53,7 @@
+ #include "cpu/minor/fetch2.hh"
+ #include "params/BaseMinorCPU.hh"
+ #include "sim/ticked_object.hh"
++#include "cpu/minor/execute_dummy.hh"
+ 
+ namespace gem5
+ {
+@@ -81,10 +82,16 @@ class Pipeline : public Ticked
+     Latch<ForwardLineData> f1ToF2;
+     Latch<BranchData> f2ToF1;
+     Latch<ForwardInstData> f2ToD;
+-    Latch<ForwardInstData> dToE;
++    // Updated the latch name between the decode and E1(aka dummyE) stage : GVS
++    Latch<ForwardInstData> dToE1;
++    // New latch added between E1 and E stage: GVS
++    Latch<ForwardInstData> e1ToE;
+     Latch<BranchData> eToF1;
++    
+ 
+     Execute execute;
++    //Adding the Execute_dummy stage object: GVS
++    Execute_dummy execute_dummy;
+     Decode decode;
+     Fetch2 fetch2;
+     Fetch1 fetch1;
+@@ -100,8 +107,8 @@ class Pipeline : public Ticked
+     {
+         /* A stage representing wakeup of the whole processor */
+         CPUStageId = 0,
+-        /* Real pipeline stages */
+-        Fetch1StageId, Fetch2StageId, DecodeStageId, ExecuteStageId,
++        /* Real pipeline stages */ // GVS might need to add one for our dummy stage
++        Fetch1StageId, Fetch2StageId, DecodeStageId, ExecuteDummyStageId, ExecuteStageId, 
+         Num_StageId /* Stage count */
+     };
+ 

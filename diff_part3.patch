@@ -1,0 +1,478 @@
+diff --git a/src/cpu/minor/BaseMinorCPU.py b/src/cpu/minor/BaseMinorCPU.py
+index ca7c781..ac26743 100644
+--- a/src/cpu/minor/BaseMinorCPU.py
++++ b/src/cpu/minor/BaseMinorCPU.py
+@@ -217,7 +217,7 @@ class BaseMinorCPU(BaseCPU):
+         "Backward cycle delay from Fetch2 to Fetch1 for branch prediction"
+         " signalling (0 means in the same cycle, 1 mean the next cycle)")
+ 
+-    fetch2InputBufferSize = Param.Unsigned(1,
++    fetch2InputBufferSize = Param.Unsigned(2,
+         "Size of input buffer to Fetch2 in cycles-worth of insts.")
+     fetch2ToDecodeForwardDelay = Param.Cycles(1,
+         "Forward cycle delay from Fetch2 to Decode (1 means next cycle)")
+@@ -225,18 +225,18 @@ class BaseMinorCPU(BaseCPU):
+         "Allow Fetch2 to cross input lines to generate full output each"
+         " cycle")
+ 
+-    decodeInputBufferSize = Param.Unsigned(1,
++    decodeInputBufferSize = Param.Unsigned(3,
+         "Size of input buffer to Decode in cycles-worth of insts.")
+     decodeToExecuteForwardDelay = Param.Cycles(1,
+         "Forward cycle delay from Decode to Execute (1 means next cycle)")
+-    decodeInputWidth = Param.Unsigned(1,
++    decodeInputWidth = Param.Unsigned(2,
+         "Width (in instructions) of input to Decode (and implicitly"
+         " Decode's own width)")
+     decodeCycleInput = Param.Bool(True,
+         "Allow Decode to pack instructions from more than one input cycle"
+         " to fill its output each cycle")
+ 
+-    executeInputWidth = Param.Unsigned(1,
++    executeInputWidth = Param.Unsigned(2,
+         "Width (in instructions) of input to Execute")
+     executeCycleInput = Param.Bool(True,
+         "Allow Execute to use instructions from more than one input cycle"
+@@ -249,7 +249,7 @@ class BaseMinorCPU(BaseCPU):
+         "Number of committable instructions in Execute each cycle")
+     executeMemoryCommitLimit = Param.Unsigned(1,
+         "Number of committable memory references in Execute each cycle")
+-    executeInputBufferSize = Param.Unsigned(1,
++    executeInputBufferSize = Param.Unsigned(7,
+         "Size of input buffer to Execute in cycles-worth of insts.")
+     executeMemoryWidth = Param.Unsigned(0,
+         "Width (and snap) in bytes of the data memory interface. (0 mean use"
+diff --git a/src/cpu/minor/SConscript b/src/cpu/minor/SConscript
+index 8bdc654..cd1b8e3 100644
+--- a/src/cpu/minor/SConscript
++++ b/src/cpu/minor/SConscript
+@@ -51,7 +51,6 @@ if env['CONF']['TARGET_ISA'] != 'null':
+     Source('decode.cc')
+     Source('dyn_inst.cc')
+     Source('execute.cc')
+-    Source('execute_dummy.cc')
+     Source('fetch1.cc')
+     Source('fetch2.cc')
+     Source('func_unit.cc')
+diff --git a/src/cpu/minor/execute_dummy.cc b/src/cpu/minor/execute_dummy.cc
+deleted file mode 100644
+index 76b84dc..0000000
+--- a/src/cpu/minor/execute_dummy.cc
++++ /dev/null
+@@ -1,166 +0,0 @@
+-#include "cpu/minor/execute_dummy.hh"
+-
+-#include <vector>
+-
+-#include "base/named.hh"
+-#include "cpu/minor/buffers.hh"
+-#include "cpu/minor/cpu.hh"
+-#include "cpu/minor/dyn_inst.hh"
+-#include "cpu/minor/pipe_data.hh"
+-#include "cpu/minor/pipeline.hh"
+-
+-namespace gem5
+-{
+-
+-
+-GEM5_DEPRECATED_NAMESPACE(Minor, minor);
+-namespace minor
+-{
+-
+-  //Constructor
+-Execute_dummy::Execute_dummy(const std::string &name,
+-    MinorCPU &cpu_,
+-    const BaseMinorCPUParams &params,
+-    Latch<ForwardInstData>::Output inp_,
+-    Latch<ForwardInstData>::Input out_,
+-    std::vector<InputBuffer<ForwardInstData>> &next_stage_input_buffer) :
+-    Named(name),
+-    cpu(cpu_),
+-    inp(inp_),
+-    out(out_),
+-    nextStageReserve(next_stage_input_buffer),
+-    execdummyInfo(params.numThreads),
+-    threadPriority(0)
+-{
+-    if (params.executeInputBufferSize < 1) {
+-        fatal("%s: executeDummyInputBufferSize must be >= 1 (%d)\n", name,
+-          params.executeInputBufferSize);
+-    }
+-
+-    for (ThreadID tid=0; tid < params.numThreads ; tid++) {
+-        inputBuffer.push_back(
+-            InputBuffer<ForwardInstData>(name + ".inputBuffer" +
+-              std::to_string(tid), "insts", params.executeInputBufferSize));
+-    }
+-}
+-
+-const ForwardInstData * Execute_dummy::getInput(ThreadID tid)
+-{
+-    /* Get insts from the inputBuffer to send it to the actual execute stage*/
+-    if (!inputBuffer[tid].empty()) {
+-        const ForwardInstData &head = inputBuffer[tid].front();
+-
+-        return (head.isBubble() ? NULL : &(inputBuffer[tid].front()));
+-    } else {
+-        return NULL;
+-    }
+-}
+-
+-void Execute_dummy::popInput(ThreadID tid)
+-{
+-    if (!inputBuffer[tid].empty())
+-          inputBuffer[tid].pop();
+-
+-}
+-
+-void Execute_dummy::evaluate()
+-{
+-    if (!inp.outputWire->isBubble())
+-        inputBuffer[inp.outputWire->threadId].setTail(*inp.outputWire);
+-
+-    ForwardInstData &insts_out = *out.inputWire;
+-
+-    assert(insts_out.isBubble());
+-
+-    // Check if for all threadIds can we reserve a space in
+-    // the buffer in the next stage
+-    for (ThreadID tid=0; tid < cpu.numThreads; tid++)
+-       execdummyInfo[tid].blocked = !nextStageReserve[tid].canReserve();
+-
+-    // deciding which thread to pick and push data to the next stage
+-    ThreadID tid = getScheduledThread();
+-
+-    if (tid != InvalidThreadID) {
+-        // Push the data to the output
+-
+-        const ForwardInstData *insts_in = getInput(tid);
+-
+-        insts_out = *insts_in;
+-        //std::cout << "copied data" ;
+-        popInput(tid);
+-
+-        if (!insts_out.isBubble()) {
+-            cpu.activityRecorder->activity();
+-            insts_out.threadId = tid;
+-            nextStageReserve[tid].reserve();
+-        }
+-
+-        for (ThreadID i = 0; i < cpu.numThreads; i++)
+-        {
+-           if (getInput(i) && nextStageReserve[i].canReserve()) {
+-              cpu.activityRecorder->activateStage(Pipeline
+-                ::ExecuteDummyStageId);
+-               break;
+-            }
+-        }
+-
+-
+-    }
+-        if (!inp.outputWire->isBubble())
+-          inputBuffer[inp.outputWire->threadId].pushTail();
+-
+-}
+-
+-
+-inline ThreadID
+-Execute_dummy::getScheduledThread()
+-{
+-    /* Select thread via policy. */
+-    std::vector<ThreadID> priority_list;
+-
+-    switch (cpu.threadPolicy) {
+-      case enums::SingleThreaded:
+-        priority_list.push_back(0);
+-        break;
+-      case enums::RoundRobin:
+-        priority_list = cpu.roundRobinPriority(threadPriority);
+-        break;
+-      case enums::Random:
+-        priority_list = cpu.randomPriority();
+-        break;
+-      default:
+-        panic("Unknown fetch policy");
+-    }
+-
+-    for (auto tid : priority_list) {
+-        if (getInput(tid) && !execdummyInfo[tid].blocked) {
+-            threadPriority = tid;
+-            return tid;
+-        }
+-    }
+-
+-   return InvalidThreadID;
+-}
+-
+-bool Execute_dummy::isDrained()
+-{
+-    for (const auto &buffer : inputBuffer) {
+-        if (!buffer.empty())
+-            return false;
+-    }
+-
+-    return (*inp.outputWire).isBubble();
+-}
+-
+-
+-/*void Execute_dummy::minorTrace() const
+-{
+-    std::ostringstream data;
+-
+-}*/
+-
+-
+-}
+-
+-
+-}
+diff --git a/src/cpu/minor/execute_dummy.hh b/src/cpu/minor/execute_dummy.hh
+deleted file mode 100644
+index ecb392e..0000000
+--- a/src/cpu/minor/execute_dummy.hh
++++ /dev/null
+@@ -1,96 +0,0 @@
+-#ifndef __CPU_MINOR_EDUMMY_HH__
+-#define __CPU_MINOR_EDUMMY_HH__
+-
+-#include <vector>
+-
+-#include <base/named.hh>
+-#include <base/types.hh>
+-
+-#include "cpu/minor/buffers.hh"
+-#include "cpu/minor/cpu.hh"
+-#include "cpu/minor/pipe_data.hh"
+-
+-// Not adding func_unit, lsq, scoreboard as this stage is dummy : GVS
+-
+-namespace gem5
+-{
+-
+-GEM5_DEPRECATED_NAMESPACE(Minor, minor);
+-namespace minor
+-{
+-
+-
+-  /** Dummy execute stage with a attempt to observe more stalls
+-  */
+-
+-  class Execute_dummy : public Named
+-  {
+-    protected:
+-
+-      MinorCPU &cpu; //GVS: Rethink if this is needed?
+-      /** Input port carrying instructions from Decode*/
+-      Latch<ForwardInstData>::Output inp;
+-
+-      /* Port carrying instructions to the actual Execute stage*/
+-      Latch<ForwardInstData>::Input out;
+-
+-      /** Pointer back to the containing CPU*/
+-
+-      std::vector<InputBuffer<ForwardInstData>> &nextStageReserve;
+-
+-    public:
+-      std::vector<InputBuffer<ForwardInstData>> inputBuffer;
+-
+-    protected:
+-
+-       struct ExecdummyInfo
+-       {
+-          ExecdummyInfo() {}
+-
+-          ExecdummyInfo(const ExecdummyInfo& other) :
+-              blocked(other.blocked)
+-          { }
+-
+-          bool blocked = false;
+-
+-       };
+-
+-        std::vector<ExecdummyInfo> execdummyInfo;
+-        ThreadID threadPriority;
+-
+-    protected:
+-      const ForwardInstData *getInput(ThreadID tid);
+-
+-      void popInput(ThreadID tid);
+-
+-
+-      /** Use the current threading policy to determine the next thread to
+-      *  push data from. */
+-      ThreadID getScheduledThread();
+-
+-
+-    public:
+-      Execute_dummy(const std::string &name,
+-          MinorCPU &cpu_,
+-          const BaseMinorCPUParams &params,
+-          Latch<ForwardInstData>::Output inp_,
+-          Latch<ForwardInstData>::Input out_,
+-          std::vector<InputBuffer<ForwardInstData>> &next_stage_input_buffer);
+-
+-        // Do we add a destructor or not ??
+-
+-    public:
+-       void evaluate();
+-
+-       //void minorTrace() const;
+-
+-       bool isDrained();
+-  };
+-
+-
+-
+-
+-} //namespace minor
+-} // namespace gem5
+-
+-#endif /* __CPU_MINOR_EDUMMY_HH__ */
+diff --git a/src/cpu/minor/pipeline.cc b/src/cpu/minor/pipeline.cc
+index 6d361aa..e94181f 100644
+--- a/src/cpu/minor/pipeline.cc
++++ b/src/cpu/minor/pipeline.cc
+@@ -41,7 +41,6 @@
+ 
+ #include "cpu/minor/decode.hh"
+ #include "cpu/minor/execute.hh"
+-#include "cpu/minor/execute_dummy.hh"
+ #include "cpu/minor/fetch1.hh"
+ #include "cpu/minor/fetch2.hh"
+ #include "debug/Drain.hh"
+@@ -66,18 +65,14 @@ Pipeline::Pipeline(MinorCPU &cpu_, const BaseMinorCPUParams &params) :
+         params.fetch1ToFetch2BackwardDelay, true),
+     f2ToD(cpu.name() + ".f2ToD", "insts",
+         params.fetch2ToDecodeForwardDelay),
+-    dToE1(cpu.name() + ".dToE1", "insts",
+-        params.decodeToExecuteForwardDelay),
+-    e1ToE(cpu.name() + ".e1ToE", "insts",
++    dToE(cpu.name() + ".dToE", "insts",
+         params.decodeToExecuteForwardDelay),
+     eToF1(cpu.name() + ".eToF1", "branch",
+         params.executeBranchDelay),
+     execute(cpu.name() + ".execute", cpu, params,
+-        e1ToE.output(), eToF1.input()),
+-    execute_dummy(cpu.name() + ".execute_dummy", cpu, params,
+-        dToE1.output(), e1ToE.input(),execute.inputBuffer),
++        dToE.output(), eToF1.input()),
+     decode(cpu.name() + ".decode", cpu, params,
+-        f2ToD.output(), dToE1.input(), execute_dummy.inputBuffer),
++        f2ToD.output(), dToE.input(), execute.inputBuffer),
+     fetch2(cpu.name() + ".fetch2", cpu, params,
+         f1ToF2.output(), eToF1.output(), f2ToF1.input(), f2ToD.input(),
+         decode.inputBuffer),
+@@ -121,10 +116,7 @@ Pipeline::minorTrace() const
+     fetch2.minorTrace();
+     f2ToD.minorTrace();
+     decode.minorTrace();
+-    dToE1.minorTrace();
+-    //Revisit if I need to add minorTrace for the dummy execute state : GVS
+-    //execute_dummy.minorTrace();
+-    e1ToE.minorTrace();
++    dToE.minorTrace();
+     execute.minorTrace();
+     eToF1.minorTrace();
+     activityRecorder.minorTrace();
+@@ -140,7 +132,6 @@ Pipeline::evaluate()
+      *  'immediate', 0-time-offset TimeBuffer activity to be visible from
+      *  later stages to earlier ones in the same cycle */
+     execute.evaluate();
+-    execute_dummy.evaluate();
+     decode.evaluate();
+     fetch2.evaluate();
+     fetch1.evaluate();
+@@ -152,8 +143,7 @@ Pipeline::evaluate()
+     f1ToF2.evaluate();
+     f2ToF1.evaluate();
+     f2ToD.evaluate();
+-    dToE1.evaluate();
+-    e1ToE.evaluate();
++    dToE.evaluate();
+     eToF1.evaluate();
+ 
+     /* The activity recorder must be be called after all the stages and
+@@ -175,7 +165,6 @@ Pipeline::evaluate()
+         activityRecorder.deactivateStage(Pipeline::Fetch1StageId);
+         activityRecorder.deactivateStage(Pipeline::Fetch2StageId);
+         activityRecorder.deactivateStage(Pipeline::DecodeStageId);
+-        activityRecorder.deactivateStage(Pipeline::ExecuteDummyStageId);
+         activityRecorder.deactivateStage(Pipeline::ExecuteStageId);
+     }
+ 
+@@ -243,22 +232,17 @@ Pipeline::isDrained()
+     bool fetch1_drained = fetch1.isDrained();
+     bool fetch2_drained = fetch2.isDrained();
+     bool decode_drained = decode.isDrained();
+-    //Revisit what this function should be : GVS
+-    bool execute_dummy_drained = execute_dummy.isDrained();
+     bool execute_drained = execute.isDrained();
+ 
+     bool f1_to_f2_drained = f1ToF2.empty();
+     bool f2_to_f1_drained = f2ToF1.empty();
+     bool f2_to_d_drained = f2ToD.empty();
+-
+-    bool d_to_ed_drained = dToE1.empty();
+-    bool ed_to_e_drained = e1ToE.empty();
+-
++    bool d_to_e_drained = dToE.empty();
+ 
+     bool ret = fetch1_drained && fetch2_drained &&
+-        decode_drained && execute_dummy_drained &&execute_drained &&
++        decode_drained && execute_drained &&
+         f1_to_f2_drained && f2_to_f1_drained &&
+-        f2_to_d_drained && d_to_ed_drained && ed_to_e_drained;
++        f2_to_d_drained && d_to_e_drained;
+ 
+     DPRINTF(MinorCPU, "Pipeline undrained stages state:%s%s%s%s%s%s%s%s\n",
+         (fetch1_drained ? "" : " Fetch1"),
+@@ -268,8 +252,7 @@ Pipeline::isDrained()
+         (f1_to_f2_drained ? "" : " F1->F2"),
+         (f2_to_f1_drained ? "" : " F2->F1"),
+         (f2_to_d_drained ? "" : " F2->D"),
+-        (d_to_ed_drained ? "" : " D->E1"),
+-        (ed_to_e_drained ? "" : "ED->E")
++        (d_to_e_drained ? "" : " D->E")
+         );
+ 
+     return ret;
+diff --git a/src/cpu/minor/pipeline.hh b/src/cpu/minor/pipeline.hh
+index af288ab..ce0ae07 100644
+--- a/src/cpu/minor/pipeline.hh
++++ b/src/cpu/minor/pipeline.hh
+@@ -49,7 +49,6 @@
+ #include "cpu/minor/cpu.hh"
+ #include "cpu/minor/decode.hh"
+ #include "cpu/minor/execute.hh"
+-#include "cpu/minor/execute_dummy.hh"
+ #include "cpu/minor/fetch1.hh"
+ #include "cpu/minor/fetch2.hh"
+ #include "params/BaseMinorCPU.hh"
+@@ -82,16 +81,10 @@ class Pipeline : public Ticked
+     Latch<ForwardLineData> f1ToF2;
+     Latch<BranchData> f2ToF1;
+     Latch<ForwardInstData> f2ToD;
+-    // Updated the latch name between the decode and E1(aka dummyE) stage : GVS
+-    Latch<ForwardInstData> dToE1;
+-    // New latch added between E1 and E stage: GVS
+-    Latch<ForwardInstData> e1ToE;
++    Latch<ForwardInstData> dToE;
+     Latch<BranchData> eToF1;
+ 
+-
+     Execute execute;
+-    //Adding the Execute_dummy stage object: GVS
+-    Execute_dummy execute_dummy;
+     Decode decode;
+     Fetch2 fetch2;
+     Fetch1 fetch1;
+@@ -108,8 +101,7 @@ class Pipeline : public Ticked
+         /* A stage representing wakeup of the whole processor */
+         CPUStageId = 0,
+         /* Real pipeline stages */
+-        Fetch1StageId, Fetch2StageId, DecodeStageId, ExecuteDummyStageId,
+-        ExecuteStageId,
++        Fetch1StageId, Fetch2StageId, DecodeStageId, ExecuteStageId,
+         Num_StageId /* Stage count */
+     };
+ 

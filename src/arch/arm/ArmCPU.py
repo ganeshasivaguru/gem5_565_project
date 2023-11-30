@@ -76,3 +76,6 @@ class ArmO3CPU(BaseO3CPU, ArmCPU):
 
 class ArmMinorCPU(BaseMinorCPU, ArmCPU):
     mmu = ArmMMU()
+
+
+

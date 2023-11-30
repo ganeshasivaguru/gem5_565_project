@@ -1,0 +1,93 @@
+scons: Reading SConscript files ...
+Mkdir("/home/min/a/gvedaraj/GEM5_ECE56500_FALL23/build/ECE565-ARM/gem5.build")
+Checking for linker -Wl,--as-needed support... (cached) yes
+Checking for compiler -Wno-free-nonheap-object support... (cached) yes
+Checking for compiler -gz support... (cached) no
+Warning: Can't enable object file debug section compression
+Checking for linker -gz support... (cached) no
+Warning: Can't enable executable debug section compression
+Info: Using Python config: python3-config
+Checking for C header file Python.h... (cached) yes
+Checking Python version... (cached) 3.6.8
+Checking for accept(0,0,0) in C++ library None... (cached) yes
+Checking for zlibVersion() in C++ library z... (cached) yes
+Checking for C library tcmalloc... (cached) yes
+Building in /home/min/a/gvedaraj/GEM5_ECE56500_FALL23/build/ECE565-ARM
+Using saved variables file(s) /home/min/a/gvedaraj/GEM5_ECE56500_FALL23/build/ECE565-ARM/gem5.build/variables
+Checking for C header file fenv.h... (cached) yes
+Checking for C header file png.h... (cached) yes
+Checking for clock_nanosleep(0,0,NULL,NULL) in C library None... (cached) yes
+Checking for C header file valgrind/valgrind.h... (cached) yes
+Warning: Deprecated namespaces are not supported by this compiler.
+         Please make sure to check the mailing list for deprecation
+         announcements.
+Checking for pkg-config package hdf5-serial... (cached) no
+Checking for pkg-config package hdf5... (cached) no
+Warning: Couldn't find HDF5 C++ libraries. Disabling HDF5 support.
+Checking for C header file linux/kvm.h... (cached) yes
+Checking for timer_create(CLOCK_MONOTONIC, NULL, NULL) in C library None... (cached) no
+Checking for timer_create(CLOCK_MONOTONIC, NULL, NULL) in C library rt... (cached) yes
+Checking size of struct kvm_xsave ... (cached) yes
+Checking for member exclude_host in struct perf_event_attr...(cached) yes
+Checking for C header file linux/if_tun.h... (cached) yes
+Checking for shm_open("/test", 0, 0) in C library None... (cached) yes
+Checking for pkg-config package protobuf... (cached) yes
+Warning: Did not find protocol buffer library and/or headers.
+         Please install libprotobuf-dev for tracing support.
+Checking for char temp; backtrace_symbols_fd((void *)&temp, 0, 0) in C library None... (cached) yes
+Checking whether __i386__ is declared... (cached) no
+Checking whether __x86_64__ is declared... (cached) yes
+Checking for compiler -Wno-self-assign-overloaded support... (cached) yes
+Checking for compiler -Wno-free-nonheap-object support... (cached) yes
+scons: done reading SConscript files.
+scons: Building targets ...
+ [ENUMDECL] m5.objects.ArmISA, DecoderFlavor -> ECE565-ARM/enums/DecoderFlavor.hh
+ [SO Param] m5.objects.ArmDecoder, ArmDecoder -> ECE565-ARM/params/ArmDecoder.hh
+ [ENUMDECL] m5.objects.ArmSystem, ArmExtension -> ECE565-ARM/enums/ArmExtension.hh
+ [SO Param] m5.objects.InstDecoder, InstDecoder -> ECE565-ARM/params/InstDecoder.hh
+ [ENUMDECL] m5.objects.StaticInstFlags, StaticInstFlags -> ECE565-ARM/enums/StaticInstFlags.hh
+ [ENUMDECL] m5.objects.ArmTLB, ArmLookupLevel -> ECE565-ARM/enums/ArmLookupLevel.hh
+ [SO Param] m5.objects.ArmMMU, ArmMMU -> ECE565-ARM/params/ArmMMU.hh
+ [SO Param] m5.objects.ArmSystem, ArmSystem -> ECE565-ARM/params/ArmSystem.hh
+ [SO Param] m5.objects.SimObject, SimObject -> ECE565-ARM/params/SimObject.hh
+ [ENUMDECL] m5.objects.FuncUnit, OpClass -> ECE565-ARM/enums/OpClass.hh
+ [ENUMDECL] m5.objects.SimObject, ByteOrder -> ECE565-ARM/enums/ByteOrder.hh
+ [ENUMDECL] m5.objects.BaseTLB, TypeTLB -> ECE565-ARM/enums/TypeTLB.hh
+ [SO Param] m5.objects.ArmTLB, ArmTLB -> ECE565-ARM/params/ArmTLB.hh
+ [SO Param] m5.objects.BaseMMU, BaseMMU -> ECE565-ARM/params/BaseMMU.hh
+ [SO Param] m5.objects.BaseTLB, BaseTLB -> ECE565-ARM/params/BaseTLB.hh
+ [ENUMDECL] m5.objects.System, MemoryMode -> ECE565-ARM/enums/MemoryMode.hh
+ [SO Param] m5.objects.System, System -> ECE565-ARM/params/System.hh
+ [SO Param] m5.objects.RedirectPath, RedirectPath -> ECE565-ARM/params/RedirectPath.hh
+ [SO Param] m5.objects.Workload, StubWorkload -> ECE565-ARM/params/StubWorkload.hh
+ [SO Param] m5.objects.Workload, Workload -> ECE565-ARM/params/Workload.hh
+ [SO Param] m5.objects.ArmInterrupts, ArmInterrupts -> ECE565-ARM/params/ArmInterrupts.hh
+ [SO Param] m5.objects.BaseInterrupts, BaseInterrupts -> ECE565-ARM/params/BaseInterrupts.hh
+ [SO Param] m5.objects.ClockedObject, ClockedObject -> ECE565-ARM/params/ClockedObject.hh
+ [SO Param] m5.objects.ClockDomain, ClockDomain -> ECE565-ARM/params/ClockDomain.hh
+ [SO Param] m5.objects.ClockDomain, DerivedClockDomain -> ECE565-ARM/params/DerivedClockDomain.hh
+ [SO Param] m5.objects.ClockDomain, SrcClockDomain -> ECE565-ARM/params/SrcClockDomain.hh
+ [ENUMDECL] m5.objects.PowerState, PwrState -> ECE565-ARM/enums/PwrState.hh
+ [SO Param] m5.objects.PowerState, PowerState -> ECE565-ARM/params/PowerState.hh
+ [SO Param] m5.objects.ArmISA, ArmISA -> ECE565-ARM/params/ArmISA.hh
+ [SO Param] m5.objects.CheckerCPU, CheckerCPU -> ECE565-ARM/params/CheckerCPU.hh
+ [SO Param] m5.objects.Gic, Gicv3 -> ECE565-ARM/params/Gicv3.hh
+ [ENUMDECL] m5.objects.Gic, ArmInterruptType -> ECE565-ARM/enums/ArmInterruptType.hh
+ [SO Param] m5.objects.Device, BasicPioDevice -> ECE565-ARM/params/BasicPioDevice.hh
+ [SO Param] m5.objects.Device, PioDevice -> ECE565-ARM/params/PioDevice.hh
+ [SO Param] m5.objects.Process, Process -> ECE565-ARM/params/Process.hh
+ [SO Param] m5.objects.Process, EmulatedDriver -> ECE565-ARM/params/EmulatedDriver.hh
+ [SO Param] m5.objects.ArmSeWorkload, ArmEmuLinux -> ECE565-ARM/params/ArmEmuLinux.hh
+ [SO Param] m5.objects.ArmSeWorkload, ArmSEWorkload -> ECE565-ARM/params/ArmSEWorkload.hh
+ [SO Param] m5.objects.Workload, SEWorkload -> ECE565-ARM/params/SEWorkload.hh
+ [SO Param] m5.objects.ArmFsWorkload, ArmFsLinux -> ECE565-ARM/params/ArmFsLinux.hh
+scons: building terminated because of errors.
+*** Summary of Warnings ***
+Warning: Can't enable object file debug section compression
+Warning: Can't enable executable debug section compression
+Warning: Deprecated namespaces are not supported by this compiler.
+         Please make sure to check the mailing list for deprecation
+         announcements.
+Warning: Couldn't find HDF5 C++ libraries. Disabling HDF5 support.
+Warning: Did not find protocol buffer library and/or headers.
+         Please install libprotobuf-dev for tracing support.
