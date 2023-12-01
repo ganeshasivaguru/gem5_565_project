@@ -92,15 +92,16 @@ class ShepherdTags : public BaseTags
     replacement_policy::Base *replacementPolicy;
 
   public:
-    std::vector<CacheBlk(*)[4]> sc_queue; //Vector of arrays pointing
-    //to sc entries in each set.The vector will have NumSets number of entries.
+    CacheBlk*** sc_queue;
+    //Vector of arrays pointing to sc entries in each set.
+    // The vector will have NumSets number of entries.
 
-    std::vector<int> next_sc_queue; // This will point to the next
-    //SC_queue entry that will be replaced.
-    //The vector will have NumSets number of entries.
+    std::vector<int> next_sc_queue;
+    // This will point to the next SC_queue entry that will be replaced.
+    // The vector will have NumSets number of entries.
 
-    std::vector<std::array<int,4>> next_value_count; // Creating a vector of
-    //next_value_count where each entry
+    std::vector<std::array<int,4>> next_value_count;
+    // Creating a vector of next_value_count where each entry
 
   public:
     /** Convenience typedef. */
@@ -109,12 +110,20 @@ class ShepherdTags : public BaseTags
     /**
      * Construct and initialize this tag store.
      */
-    BaseSetAssoc(const Params &p);
+    ShepherdTags(const Params &p);
 
     /**
      * Destructor
      */
-    virtual ~BaseSetAssoc() {};
+    virtual ~ShepherdTags() {
+    for (int i=0; i<numSets; i++) {
+        for (int j=0; j<4; j++) {
+            delete [] sc_queue[i][j];
+        }
+    }
+    //delete next_value_count;
+    //delete next_sc_queue;
+    }
 
     /**
      * Initialize blocks as CacheBlk instances.
@@ -163,6 +172,13 @@ class ShepherdTags : public BaseTags
 
             // Update replacement data of accessed block
             replacementPolicy->touch(blk->replacementData, pkt);
+
+            /* GVS*/
+            /* Updating the nvc count and then copying it to the count*/
+            for (int i=0; i<4; i++) {
+                if (sc_queue[i])
+            }
+
         }
 
         // The tag lookup latency is the same for a hit or a miss
@@ -184,7 +200,7 @@ class ShepherdTags : public BaseTags
     CacheBlk* findVictim(Addr addr, const bool is_secure,
                          const std::size_t size,
                          std::vector<CacheBlk*>& evict_blks) override
-                         //GVS: edit this based on the changes in the document
+    //GVS: edit this based on the changes in the document
     {
         // Get possible entries to be victimized
         const std::vector<ReplaceableEntry*> entries =

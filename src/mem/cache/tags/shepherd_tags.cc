@@ -69,8 +69,8 @@ ShepherdTags::ShepherdTags(const Params &p)
 
     // Initialize sc_queue, next_sc_queue and next_value_count
     for (int i=0; i < numSets; i++) {
-        for (int j=0; j < 4; j++) { //Later this 4
-        //has to be made equal to SC-way size
+        for (int j=0; j < 4; j++) {
+            //Later this 4 has to be made equal to SC-way size
             CacheBlk* cblk = new CacheBlk();
             sc_queue[i][j] = cblk;
             next_value_count[i][j] = 0;
@@ -80,15 +80,26 @@ ShepherdTags::ShepherdTags(const Params &p)
 }
 
 void
-BaseSetAssoc::tagsInit()
+ShepherdTags::tagsInit()
 {
     // Initialize all blocks
     for (unsigned blk_index = 0; blk_index < numBlocks; blk_index++) {
         // Locate next cache block
         CacheBlk* blk = &blks[blk_index];
 
+
         // Link block to indexing policy
         indexingPolicy->setEntry(blk, blk_index);
+
+        /* GVS*/
+        /* Trying to allocate sc_queue to the last 4 blocks in a set*/
+        const std::lldiv_t result = std::div((long long)blk_index, allocAssoc);
+        const uint32_t set = result.quot;
+        const uint32_t way = result.rem;
+        if (way >= allocAssoc - 4) {
+            sc_queue[set][way - (allocAssoc - 4)] = blk;
+        }
+
 
         // Associate a data chunk to the block
         blk->data = &dataBlks[blkSize*blk_index];
@@ -99,7 +110,7 @@ BaseSetAssoc::tagsInit()
 }
 
 void
-BaseSetAssoc::invalidate(CacheBlk *blk)
+ShepherdTags::invalidate(CacheBlk *blk)
 {
     BaseTags::invalidate(blk);
 
@@ -111,7 +122,7 @@ BaseSetAssoc::invalidate(CacheBlk *blk)
 }
 
 void
-BaseSetAssoc::moveBlock(CacheBlk *src_blk, CacheBlk *dest_blk)
+ShepherdTags::moveBlock(CacheBlk *src_blk, CacheBlk *dest_blk)
 {
     BaseTags::moveBlock(src_blk, dest_blk);
 
