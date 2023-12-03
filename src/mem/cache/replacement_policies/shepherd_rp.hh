@@ -64,12 +64,13 @@ class Shepherd : public Base
         bool isMC;
 
 
+
         /**
          * Default constructor. Invalidate data.
          */
         ShepherdReplData() : isSC(0), isMC(0), lastTouchTick(0) {
           for (int j=0; j<4; j++) {
-            count[j] = 0;
+            count[j] = -1; // -1 equals "e" in the paper
           }
         }
     };
@@ -78,6 +79,7 @@ class Shepherd : public Base
     typedef ShepherdRPParams Params;
     Shepherd(const Params &p);
     ~Shepherd() = default;
+
 
     /**
      * Invalidate replacement data to set it as the next probable victim.
@@ -95,7 +97,7 @@ class Shepherd : public Base
      * @param replacement_data Replacement data to be touched.
      */
     void touch(const std::shared_ptr<ReplacementData>& replacement_data) const
-                                                                     override;
+                                                                      override;
 
     /**
      * Reset replacement data. Used when an entry is inserted.
@@ -112,7 +114,8 @@ class Shepherd : public Base
      * @param candidates Replacement candidates, selected by indexing policy.
      * @return Replacement entry to be replaced.
      */
-    ReplaceableEntry* getVictim(const ReplacementCandidates& candidates) const
+    ReplaceableEntry* getVictim(const ReplacementCandidates& candidates,
+                                                        int sc_head) const
                                                                      override;
 
     /**
@@ -121,6 +124,18 @@ class Shepherd : public Base
      * @return A shared pointer to the new replacement data.
      */
     std::shared_ptr<ReplacementData> instantiateEntry() override;
+
+    /**
+     * Function to update the count[4]
+    */
+   void incrCount(const std::shared_ptr<ReplacementData>& replacement_data,
+                    int next_value_count[4]) const;
+
+    /*
+    Function to get the current SC Head pointer
+    */
+    int getSChead(int set_no) const;
+
 };
 
 } // namespace replacement_policy

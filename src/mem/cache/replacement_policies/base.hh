@@ -102,7 +102,9 @@ class Base : public SimObject
      * @return Replacement entry to be replaced.
      */
     virtual ReplaceableEntry* getVictim(
-                           const ReplacementCandidates& candidates) const = 0;
+                           const ReplacementCandidates& candidates,
+                           int sc_head)
+                           const = 0;
 
     /**
      * Instantiate a replacement data entry.

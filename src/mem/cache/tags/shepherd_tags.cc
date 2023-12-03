@@ -67,15 +67,23 @@ ShepherdTags::ShepherdTags(const Params &p)
         fatal("Block size must be at least 4 and a power of 2");
     }
 
+    //next_value_count = new std::vector<std::array<int,4>>
     // Initialize sc_queue, next_sc_queue and next_value_count
+    next_value_count = new int*[numSets];
+    for (int i=0, i<numSets; i++) {
+            next_value_count[i] = new int[4];
+        }
+
     for (int i=0; i < numSets; i++) {
         for (int j=0; j < 4; j++) {
             //Later this 4 has to be made equal to SC-way size
-            CacheBlk* cblk = new CacheBlk();
-            sc_queue[i][j] = cblk;
-            next_value_count[i][j] = 0;
+            //CacheBlk* cblk = new CacheBlk();
+            //sc_queue[i][j] = cblk;
+            next_value_count[i][j]=-1;
+            // Setting next value count to -1 as we increment NVC first
+            // before copying to count[4] in replacement data
         }
-        next_sc_queue[i] = 0;
+        next_sc_queue.push_back(0);
     }
 }
 
@@ -96,9 +104,6 @@ ShepherdTags::tagsInit()
         const std::lldiv_t result = std::div((long long)blk_index, allocAssoc);
         const uint32_t set = result.quot;
         const uint32_t way = result.rem;
-        if (way >= allocAssoc - 4) {
-            sc_queue[set][way - (allocAssoc - 4)] = blk;
-        }
 
 
         // Associate a data chunk to the block
@@ -106,6 +111,24 @@ ShepherdTags::tagsInit()
 
         // Associate a replacement data entry to the block
         blk->replacementData = replacementPolicy->instantiateEntry();
+        if (way >= allocAssoc - 4) { // IS SC entries
+            //sc_queue[set][way - (allocAssoc - 4)] = blk;
+            blk->replacementData->isSC = true;
+            blk->replacementData->isMC = false;
+            if (!blk->isValid()) // INVALID block's count set to INT_MAX
+                                // so that it gets evicted first.
+                blk->replacementData->count[way-(allocAssoc-4)] = INT_MAX;
+
+        } else { // IS MC entries
+            blk->replacementData->isSC = false;
+            blk->replacementData->isMC = true;
+            if (!blk->isValid()) {
+                for (int i=0; i<4; i++) {
+                    blk->replacementData->count[i] = INT_MAX:
+                }
+            }
+
+        }
     }
 }
 

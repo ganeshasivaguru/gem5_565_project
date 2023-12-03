@@ -63,6 +63,17 @@ Shepherd::touch(const std::shared_ptr<ReplacementData>& replacement_data) const
         replacement_data)->lastTouchTick = curTick();
 }
 
+
+void
+Shepherd::incrCount(const std::shared_ptr<ReplacementData>& replacement_data,
+                                            int next_value_count[4]) const
+{
+      for (int i=0; i<4; i++) {
+        std::static_pointer_cast<ShepherdReplData>(
+            replacement_data)->count[i] = next_value_count[i];
+    }
+}
+
 void
 Shepherd::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
 {
@@ -72,7 +83,7 @@ Shepherd::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
 }
 
 ReplaceableEntry*
-Shepherd::getVictim(const ReplacementCandidates& candidates) const
+Shepherd::getVictim(const ReplacementCandidates& candidates, int sc_head) const
 {
     // There must be at least one replacement candidate
     assert(candidates.size() > 0);
@@ -81,12 +92,15 @@ Shepherd::getVictim(const ReplacementCandidates& candidates) const
     ReplaceableEntry* victim = candidates[0];
     for (const auto& candidate : candidates) {
         // Update victim entry if necessary
-        if (std::static_pointer_cast<ShepherdReplData>(
+
+
+        /*if (std::static_pointer_cast<ShepherdReplData>(
                     candidate->replacementData)->lastTouchTick <
                 std::static_pointer_cast<ShepherdReplData>(
                     victim->replacementData)->lastTouchTick) {
             victim = candidate;
-        }
+        }*/
+
     }
 
     return victim;
@@ -96,6 +110,12 @@ std::shared_ptr<ReplacementData>
 Shepherd::instantiateEntry()
 {
     return std::shared_ptr<ReplacementData>(new ShepherdReplData());
+}
+
+int Shepherd::getSChead(int set_no) const
+{
+
+
 }
 
 } // namespace replacement_policy

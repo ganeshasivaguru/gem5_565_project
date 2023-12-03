@@ -92,7 +92,8 @@ class ShepherdTags : public BaseTags
     replacement_policy::Base *replacementPolicy;
 
   public:
-    CacheBlk*** sc_queue;
+
+    //CacheBlk*** sc_queue;
     //Vector of arrays pointing to sc entries in each set.
     // The vector will have NumSets number of entries.
 
@@ -100,7 +101,7 @@ class ShepherdTags : public BaseTags
     // This will point to the next SC_queue entry that will be replaced.
     // The vector will have NumSets number of entries.
 
-    std::vector<std::array<int,4>> next_value_count;
+    int** next_value_count;
     // Creating a vector of next_value_count where each entry
 
   public:
@@ -115,12 +116,7 @@ class ShepherdTags : public BaseTags
     /**
      * Destructor
      */
-    virtual ~ShepherdTags() {
-    for (int i=0; i<numSets; i++) {
-        for (int j=0; j<4; j++) {
-            delete [] sc_queue[i][j];
-        }
-    }
+    virtual ~ShepherdTags() {}
     //delete next_value_count;
     //delete next_sc_queue;
     }
@@ -175,9 +171,29 @@ class ShepherdTags : public BaseTags
 
             /* GVS*/
             /* Updating the nvc count and then copying it to the count*/
+            // getting the blk's set number
+            uint64_t set_no = blk->getSet();
+            const std::vector<ReplaceableEntry*> entries =
+            indexingPolicy->getPossibleEntries(pkt->getAddr());
+
+
+
             for (int i=0; i<4; i++) {
-                if (sc_queue[i])
+                CacheBlk* sc_entry = static_cast<CacheBlk*>
+                                      (entires[allocAssoc-4+i]);
+                if (sc_entry->isValid()) {
+                    next_value_count[set_no][i]++;
+                }
             }
+            //Calling the updateCount of the blk
+            //This is a new function added in shepherdRP
+            //We will send the blk->replacementData which contains the
+            // count[4] and also nvc corresponding to that set
+            // Calling this after the for loop -- as for loop deciding on
+            // whether to update or not for each SC-way nvc.
+            replacementPolicy->incrCount(blk->replacementData,
+                                          next_value_count[set_no]);
+
 
         }
 
@@ -207,7 +223,8 @@ class ShepherdTags : public BaseTags
             indexingPolicy->getPossibleEntries(addr);
 
         // Choose replacement victim from replacement candidates
-        CacheBlk* victim = static_cast<CacheBlk*>(replacementPolicy->getVictim(
+        CacheBlk* victim = static_cast<CacheBlk*>
+                            (replacementPolicy->getVictimSC(
                                 entries));
 
         // There is only one eviction for this replacement
@@ -226,7 +243,49 @@ class ShepherdTags : public BaseTags
     // GVS: edit this based on the changes in the document
     {
         // Insert block
-        BaseTags::insertBlock(pkt, blk);
+        //BaseTags::insertBlock(pkt, blk);
+
+        bool victim_in_sc = false;
+        uint32_t victim_index;
+        int set_no = blk->getSet();
+        const std::vector<ReplaceableEntry*> entries =
+                            indexingPolicy->getPossibleEntries(pkt->getAddr());
+
+
+        int victim_index = next_sc_queue[set_no];
+        if (blk->replacementData->isSC)  {
+
+            BaseTags::insertBlock(pkt,blk);
+            next_value_count[set_no][victim_index] = -1;
+
+            // Getting all the entries in the set.
+            // update the count[victim_index] of all entries in the
+            // cache to 0
+
+            ReplacementPolicy->updateCount(entries,victim_index);
+            //In u[dateCount set count[4] to -1.
+
+            next_sc_queue[set_no] = (next_sc_queue[set_no] != 4-1) ?
+            next_sc_queue[set_no] + 1 : 0;
+
+        } else { // case where the victim block is in MC
+
+            CacheBlk* sc_head = static_cast<CacheBlk*>
+                                (entries[allocAssoc-4+victim_index]);
+
+            moveBlock(sc_head,blk); // move the scblock to victim's location
+            BaseTags::insertBlock(pkt,sc_head);
+
+            next_value_count[set_no][victim_index] = -1;
+
+            // update the count[victim_index] of all entries
+            //in the cache to 0
+
+            ReplacementPolicy->updateCount(entries,victim_index);
+
+            next_sc_queue[set_no] = (next_sc_queue[set_no] != 4-1)
+            ? next_sc_queue[set_no] + 1 : 0;
+        }
 
         // Increment tag counter
         stats.tagsInUse++;
