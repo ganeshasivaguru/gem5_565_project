@@ -53,6 +53,12 @@ Shepherd::invalidate(const std::shared_ptr<ReplacementData>& replacement_data)
     // Reset last touch timestamp
     std::static_pointer_cast<ShepherdReplData>(
         replacement_data)->lastTouchTick = Tick(0);
+
+    // When a cache blk is invalidated -- we set all count to INT_MAX
+    for (int i=0; i<4; i++) {
+        std::static_pointer_cast<ShepherdReplData>(
+            replacement_data)->count[i] = INT_MAX;
+    }
 }
 
 void
@@ -65,14 +71,17 @@ Shepherd::touch(const std::shared_ptr<ReplacementData>& replacement_data) const
 
 
 void
-Shepherd::incrCount(const std::shared_ptr<ReplacementData>& replacement_data,
+Shepherd::copyCount(const std::shared_ptr<ReplacementData>& replacement_data,
                                             int next_value_count[4]) const
 {
       for (int i=0; i<4; i++) {
+        if (std::static_pointer_cast<ShepherdReplData>(
+            replacement_data)->count[i] == -1)
         std::static_pointer_cast<ShepherdReplData>(
             replacement_data)->count[i] = next_value_count[i];
     }
 }
+
 
 void
 Shepherd::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
@@ -83,7 +92,7 @@ Shepherd::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
 }
 
 ReplaceableEntry*
-Shepherd::getVictim(const ReplacementCandidates& candidates, int sc_head) const
+Shepherd::getVictim(const ReplacementCandidates& candidates) const
 {
     // There must be at least one replacement candidate
     assert(candidates.size() > 0);
@@ -106,16 +115,68 @@ Shepherd::getVictim(const ReplacementCandidates& candidates, int sc_head) const
     return victim;
 }
 
+ReplaceableEntry*
+Shepherd::getVictimSC(const ReplacementCandidates& candidates, int sc_head)
+                                                                const
+{
+    // There must be atleast one replacement candidate
+    assert(candidates.size() > 0);
+
+    int has_e_entry;
+
+    ReplaceableEntry* victim = candidates[0];
+    ReplaceableEntry* sc_victim = candidates[0];
+
+    for (const auto& candidate : candidates) {
+
+        if (std::static_pointer_cast<ShepherdReplData>(candidate
+        ->replacementData)->count[sc_head] == -1) {
+            has_e_entry=1;
+            if (std::static_pointer_cast<ShepherdReplData>(
+                    candidate->replacementData)->lastTouchTick <
+                std::static_pointer_cast<ShepherdReplData>(
+                    victim->replacementData)->lastTouchTick) {
+
+                victim = candidate;
+
+            }
+        } else if (std::static_pointer_cast<ShepherdReplData>(candidate
+           ->replacementData)->count[sc_head] == INT_MAX) {
+            return candidate;
+            // If any invalid block --> return that as the victim;
+        } else {
+            if (std::static_pointer_cast<ShepherdReplData>(
+                candidate->replacementData)->count[sc_head] >
+                std::static_pointer_cast<ShepherdReplData>(
+                sc_victim->replacementData)->count[sc_head]) {
+                        sc_victim=candidate;
+                }
+        }
+    }
+    if (has_e_entry) {
+        // USE LRU policy
+        return victim;
+    } else {
+        // USE shepherd policy
+        return sc_victim;
+    }
+}
+
 std::shared_ptr<ReplacementData>
 Shepherd::instantiateEntry()
 {
     return std::shared_ptr<ReplacementData>(new ShepherdReplData());
 }
 
-int Shepherd::getSChead(int set_no) const
+void Shepherd::updateCount(const ReplacementCandidates& candidates,
+                                int index) const
 {
-
-
+    // This function makes the count[index] to "e(aka -1)" for all
+    // the elements of the set in picture.
+    for (const auto& candidate : candidates) {
+        std::static_pointer_cast<ShepherdReplData>(
+            candidate->replacementData)->count[index] = -1;
+    }
 }
 
 } // namespace replacement_policy

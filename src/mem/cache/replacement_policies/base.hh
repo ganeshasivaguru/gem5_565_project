@@ -101,9 +101,8 @@ class Base : public SimObject
      * @param candidates Replacement candidates, selected by indexing policy.
      * @return Replacement entry to be replaced.
      */
-    virtual ReplaceableEntry* getVictim(
-                           const ReplacementCandidates& candidates,
-                           int sc_head)
+    virtual ReplaceableEntry* getVictim(const ReplacementCandidates&
+                                    candidates)
                            const = 0;
 
     /**
@@ -112,6 +111,19 @@ class Base : public SimObject
      * @return A shared pointer to the new replacement data.
      */
     virtual std::shared_ptr<ReplacementData> instantiateEntry() = 0;
+
+    virtual void copyCount(const std::shared_ptr<ReplacementData>&
+        replacement_data,int next_value_count[4])
+                const = 0;
+
+    virtual ReplaceableEntry* getVictimSC(const ReplacementCandidates&
+                                        candidates, int sc_head)
+                                            const = 0;
+
+    virtual void updateCount(const ReplacementCandidates& candidates,
+        int index)
+            const = 0;
+
 };
 
 } // namespace replacement_policy

@@ -116,10 +116,9 @@ class ShepherdTags : public BaseTags
     /**
      * Destructor
      */
-    virtual ~ShepherdTags() {}
+    virtual ~ShepherdTags() {};
     //delete next_value_count;
     //delete next_sc_queue;
-    }
 
     /**
      * Initialize blocks as CacheBlk instances.
@@ -180,7 +179,7 @@ class ShepherdTags : public BaseTags
 
             for (int i=0; i<4; i++) {
                 CacheBlk* sc_entry = static_cast<CacheBlk*>
-                                      (entires[allocAssoc-4+i]);
+                                      (entries[allocAssoc-4+i]);
                 if (sc_entry->isValid()) {
                     next_value_count[set_no][i]++;
                 }
@@ -191,7 +190,7 @@ class ShepherdTags : public BaseTags
             // count[4] and also nvc corresponding to that set
             // Calling this after the for loop -- as for loop deciding on
             // whether to update or not for each SC-way nvc.
-            replacementPolicy->incrCount(blk->replacementData,
+            replacementPolicy->copyCount(blk->replacementData,
                                           next_value_count[set_no]);
 
 
@@ -222,10 +221,14 @@ class ShepherdTags : public BaseTags
         const std::vector<ReplaceableEntry*> entries =
             indexingPolicy->getPossibleEntries(addr);
 
+        // Logic to get the sc_head;
+        int set_no = (static_cast<CacheBlk*>(entries.front()))->getSet();
+        int sc_head = next_sc_queue[set_no];
+
         // Choose replacement victim from replacement candidates
         CacheBlk* victim = static_cast<CacheBlk*>
                             (replacementPolicy->getVictimSC(
-                                entries));
+                                entries,sc_head));
 
         // There is only one eviction for this replacement
         evict_blks.push_back(victim);
@@ -246,48 +249,59 @@ class ShepherdTags : public BaseTags
         //BaseTags::insertBlock(pkt, blk);
 
         bool victim_in_sc = false;
-        uint32_t victim_index;
         int set_no = blk->getSet();
         const std::vector<ReplaceableEntry*> entries =
                             indexingPolicy->getPossibleEntries(pkt->getAddr());
 
 
         int victim_index = next_sc_queue[set_no];
-        if (blk->replacementData->isSC)  {
+        if (blk->isValid()){
+          if (blk->replacementData.isSC)  {
+              BaseTags::insertBlock(pkt,blk);
+              next_value_count[set_no][victim_index] = -1;
+              // Getting all the entries in the set.
+              // update the count[victim_index] of all entries in the
+              // cache to e
+              replacementPolicy->updateCount(entries,victim_index);
+              //In updateCount set count[4] to -1.
+                next_sc_queue[set_no] = (next_sc_queue[set_no] != 4-1) ?
+                next_sc_queue[set_no] + 1 : 0;
+          } else { // case where the victim block is in MC
+              CacheBlk* sc_head = static_cast<CacheBlk*>
+                                  (entries[allocAssoc-4+victim_index]);
+              sc_head->replacementData.isSC = 0;
+              sc_head->replacementData.isMC = 1;
+              moveBlock(sc_head,blk); // move the scblock to victim's location
+              BaseTags::insertBlock(pkt,sc_head);
+              next_value_count[set_no][victim_index] = -1;
+              // update the count[victim_index] of all entries
+              //in the cache to 0
+              replacementPolicy->updateCount(entries,victim_index);
+                next_sc_queue[set_no] = (next_sc_queue[set_no] != 4-1)
+                ? next_sc_queue[set_no] + 1 : 0;
+          }
+        } else { // there were invalid entries that could be filled.
+            if (blk->replacementData.isMC){
+                for (int i=0; i<4; i++)  {
+                    blk->replacementData.count[i] = -1;
+                }
+            } else {
+               int index = allocAssoc - (blk->getWay());
 
+               replacementPolicy->updateCount(entries,index);
+
+               for (int i=0;i<4;i++) {
+                    if (i==index){
+                        blk->replacementData.count[i] = -1
+                    } else {
+                        blk->replacementData.count[i] = 0;
+                    }
+               }
+            }
+            // Insert the blk;
             BaseTags::insertBlock(pkt,blk);
-            next_value_count[set_no][victim_index] = -1;
-
-            // Getting all the entries in the set.
-            // update the count[victim_index] of all entries in the
-            // cache to 0
-
-            ReplacementPolicy->updateCount(entries,victim_index);
-            //In u[dateCount set count[4] to -1.
-
-            next_sc_queue[set_no] = (next_sc_queue[set_no] != 4-1) ?
-            next_sc_queue[set_no] + 1 : 0;
-
-        } else { // case where the victim block is in MC
-
-            CacheBlk* sc_head = static_cast<CacheBlk*>
-                                (entries[allocAssoc-4+victim_index]);
-
-            moveBlock(sc_head,blk); // move the scblock to victim's location
-            BaseTags::insertBlock(pkt,sc_head);
-
-            next_value_count[set_no][victim_index] = -1;
-
-            // update the count[victim_index] of all entries
-            //in the cache to 0
-
-            ReplacementPolicy->updateCount(entries,victim_index);
-
-            next_sc_queue[set_no] = (next_sc_queue[set_no] != 4-1)
-            ? next_sc_queue[set_no] + 1 : 0;
         }
-
-        // Increment tag counter
+          // Increment tag counter
         stats.tagsInUse++;
 
         // Update replacement policy

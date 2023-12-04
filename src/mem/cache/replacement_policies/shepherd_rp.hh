@@ -114,9 +114,14 @@ class Shepherd : public Base
      * @param candidates Replacement candidates, selected by indexing policy.
      * @return Replacement entry to be replaced.
      */
-    ReplaceableEntry* getVictim(const ReplacementCandidates& candidates,
-                                                        int sc_head) const
+    ReplaceableEntry* getVictim(const ReplacementCandidates& candidates) const
                                                                      override;
+
+    /*
+    * Finding SC replacement
+    */
+    ReplaceableEntry* getVictimSC(const ReplacementCandidates& candidates,
+                                              int sc_head) const override;
 
     /**
      * Instantiate a replacement data entry.
@@ -128,13 +133,11 @@ class Shepherd : public Base
     /**
      * Function to update the count[4]
     */
-   void incrCount(const std::shared_ptr<ReplacementData>& replacement_data,
-                    int next_value_count[4]) const;
+   void copyCount(const std::shared_ptr<ReplacementData>& replacement_data,
+                    int next_value_count[4]) const override;
 
-    /*
-    Function to get the current SC Head pointer
-    */
-    int getSChead(int set_no) const;
+  void updateCount(const ReplacementCandidates& candidates,
+                                int index) const override;
 
 };
 

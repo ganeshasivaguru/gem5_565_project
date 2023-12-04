@@ -84,6 +84,18 @@ class BaseSetAssoc(BaseTags):
     replacement_policy = Param.BaseReplacementPolicy(
         Parent.replacement_policy, "Replacement policy")
 
+class ShepherdTags(BaseTags):
+    type = 'ShepherdTags'
+    cxx_header = "mem/cache/tags/shepherd_tags.hh"
+    cxx_class = 'gem5::ShepherdTags'
+
+    # Get the cache associativity
+    assoc = Param.Int(Parent.assoc, "associativity")
+
+    # Get replacement policy from the parent (cache)
+    replacement_policy = Param.BaseReplacementPolicy(
+        Parent.replacement_policy, "Replacement policy")
+
 class SectorTags(BaseTags):
     type = 'SectorTags'
     cxx_header = "mem/cache/tags/sector_tags.hh"

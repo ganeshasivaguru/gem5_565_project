@@ -70,7 +70,7 @@ ShepherdTags::ShepherdTags(const Params &p)
     //next_value_count = new std::vector<std::array<int,4>>
     // Initialize sc_queue, next_sc_queue and next_value_count
     next_value_count = new int*[numSets];
-    for (int i=0, i<numSets; i++) {
+    for (int i=0; i<numSets; i++) {
             next_value_count[i] = new int[4];
         }
 
@@ -113,11 +113,11 @@ ShepherdTags::tagsInit()
         blk->replacementData = replacementPolicy->instantiateEntry();
         if (way >= allocAssoc - 4) { // IS SC entries
             //sc_queue[set][way - (allocAssoc - 4)] = blk;
-            blk->replacementData->isSC = true;
-            blk->replacementData->isMC = false;
+            (blk->replacementData)->isSC = true;
+            blk->replacementData.isMC = false;
             if (!blk->isValid()) // INVALID block's count set to INT_MAX
                                 // so that it gets evicted first.
-                blk->replacementData->count[way-(allocAssoc-4)] = INT_MAX;
+                blk->replacementData.count[way-(allocAssoc-4)] = INT_MAX;
 
         } else { // IS MC entries
             blk->replacementData->isSC = false;
