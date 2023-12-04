@@ -172,26 +172,15 @@ class ShepherdTags : public BaseTags
             /* Updating the nvc count and then copying it to the count*/
             // getting the blk's set number
             uint64_t set_no = blk->getSet();
-            const std::vector<ReplaceableEntry*> entries =
-            indexingPolicy->getPossibleEntries(pkt->getAddr());
 
-
-
-            for (int i=0; i<4; i++) {
-                CacheBlk* sc_entry = static_cast<CacheBlk*>
-                                      (entries[allocAssoc-4+i]);
-                if (sc_entry->isValid()) {
-                    next_value_count[set_no][i]++;
-                }
-            }
             //Calling the updateCount of the blk
             //This is a new function added in shepherdRP
-            //We will send the blk->replacementData which contains the
-            // count[4] and also nvc corresponding to that set
-            // Calling this after the for loop -- as for loop deciding on
-            // whether to update or not for each SC-way nvc.
+            // What this does is to check if nvc[set_no][i]!=-1
+            // and count[i]=-1 and copies nvc[set_no][i] to count[i]
+            // and then increments nvc[set_no][i]
             replacementPolicy->copyCount(blk->replacementData,
-                                          next_value_count[set_no]);
+                                          next_value_count,set_no);
+            //printf("Shepherd Touch happened");
 
 
         }
@@ -222,14 +211,17 @@ class ShepherdTags : public BaseTags
             indexingPolicy->getPossibleEntries(addr);
 
         // Logic to get the sc_head;
+        //printf("getting victim before set_no");
         int set_no = (static_cast<CacheBlk*>(entries.front()))->getSet();
+        printf("Set_no in find_victim:%d\n",set_no);
+        printf("got the set_no:%d \n",set_no);
         int sc_head = next_sc_queue[set_no];
-
+        printf("sc_head for this replacement is %d\n",sc_head);
         // Choose replacement victim from replacement candidates
         CacheBlk* victim = static_cast<CacheBlk*>
                             (replacementPolicy->getVictimSC(
                                 entries,sc_head));
-
+        printf("Exiting victimSC\n");
         // There is only one eviction for this replacement
         evict_blks.push_back(victim);
 
@@ -247,65 +239,99 @@ class ShepherdTags : public BaseTags
     {
         // Insert block
         //BaseTags::insertBlock(pkt, blk);
-
+        printf("Entered insert block \n");
         bool victim_in_sc = false;
         int set_no = blk->getSet();
         const std::vector<ReplaceableEntry*> entries =
                             indexingPolicy->getPossibleEntries(pkt->getAddr());
 
 
+        // This victim index is pointing to the head of the queue
+        // if the replacement's find algorithm is written properly
+        // it should set the replacement candidate as either
+        // the SC_way correspoding to victim_index
+        // or any MC entry
         int victim_index = next_sc_queue[set_no];
+
         if (blk->isValid()){
-          if (blk->replacementData.isSC)  {
-              BaseTags::insertBlock(pkt,blk);
-              next_value_count[set_no][victim_index] = -1;
-              // Getting all the entries in the set.
-              // update the count[victim_index] of all entries in the
-              // cache to e
-              replacementPolicy->updateCount(entries,victim_index);
-              //In updateCount set count[4] to -1.
+            printf("replacing a valid block\n");
+          if (replacementPolicy->getSCFlag(blk->replacementData))  {
+
+                // This is the case where victim block is decided
+                // as SC block.
+
+                // Insert the new packet there.
+                BaseTags::insertBlock(pkt,blk);
+
+                // reset the NVC according to the victim_index to 0
+                next_value_count[set_no][victim_index] = 0;// nvc is reset
+
+                // Getting all the entries in the set.
+                // update the count[victim_index] of all entries in the
+                // cache to e
+                // updateCount will set the count[victim_index]
+                replacementPolicy->updateCount(entries,victim_index);
+                replacementPolicy->resetCount(blk->replacementData,
+                                            victim_index);
+
                 next_sc_queue[set_no] = (next_sc_queue[set_no] != 4-1) ?
                 next_sc_queue[set_no] + 1 : 0;
+
           } else { // case where the victim block is in MC
               CacheBlk* sc_head = static_cast<CacheBlk*>
                                   (entries[allocAssoc-4+victim_index]);
-              sc_head->replacementData.isSC = 0;
-              sc_head->replacementData.isMC = 1;
-              moveBlock(sc_head,blk); // move the scblock to victim's location
-              BaseTags::insertBlock(pkt,sc_head);
-              next_value_count[set_no][victim_index] = -1;
-              // update the count[victim_index] of all entries
-              //in the cache to 0
-              replacementPolicy->updateCount(entries,victim_index);
+
+                //sc_head->replacementData.isSC = 0;
+                //sc_head->replacementData.isMC = 1;
+                replacementPolicy->updateSCMCFlags(sc_head->replacementData,
+                                                false);
+                printf("Attempting to move block\n");
+                moveBlock(sc_head,blk);
+                // move the scblock to victim's location
+                BaseTags::insertBlock(pkt,sc_head);
+                printf("Move block successful\n");
+                next_value_count[set_no][victim_index] = 0;
+
+                // update the count[victim_index] of all entries
+                //in the cache to 0
+                replacementPolicy->updateCount(entries,victim_index);
+                replacementPolicy->resetCount(sc_head->replacementData,
+                        victim_index);
+
                 next_sc_queue[set_no] = (next_sc_queue[set_no] != 4-1)
                 ? next_sc_queue[set_no] + 1 : 0;
           }
         } else { // there were invalid entries that could be filled.
-            if (blk->replacementData.isMC){
-                for (int i=0; i<4; i++)  {
+              printf("Replacing an invalid block\n");
+            if (!replacementPolicy->getSCFlag(blk->replacementData)){ //Is MC
+
+                BaseTags::insertBlock(pkt,blk);
+                // The reset function is modified to set count[i] to -1;
+                replacementPolicy->resetCount(blk->replacementData,-1);
+
+                /*for (int i=0; i<4; i++)  {
                     blk->replacementData.count[i] = -1;
-                }
-            } else {
-               int index = allocAssoc - (blk->getWay());
+                }*/
 
-               replacementPolicy->updateCount(entries,index);
-
-               for (int i=0;i<4;i++) {
+            } else { // invalid entry in SC that gets filled.
+                int index = allocAssoc - (blk->getWay());
+                BaseTags::insertBlock(pkt,blk);
+                replacementPolicy->updateCount(entries,index);
+                replacementPolicy->resetCount(blk->replacementData,index);
+                /*for (int i=0;i<4;i++) {
                     if (i==index){
                         blk->replacementData.count[i] = -1
                     } else {
                         blk->replacementData.count[i] = 0;
                     }
-               }
+               }*/
             }
-            // Insert the blk;
-            BaseTags::insertBlock(pkt,blk);
         }
           // Increment tag counter
         stats.tagsInUse++;
+        printf("Exited insertBlock\n");
 
         // Update replacement policy
-        replacementPolicy->reset(blk->replacementData, pkt);
     }
 
     void moveBlock(CacheBlk *src_blk, CacheBlk *dest_blk) override;

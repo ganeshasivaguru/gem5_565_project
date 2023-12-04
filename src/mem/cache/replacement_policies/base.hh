@@ -95,6 +95,12 @@ class Base : public SimObject
     virtual void reset(const std::shared_ptr<ReplacementData>&
         replacement_data) const = 0;
 
+    virtual void resetCount(const std::shared_ptr<ReplacementData>&
+        replacement_data,int index) const {
+
+        }
+
+
     /**
      * Find replacement victim among candidates.
      *
@@ -113,16 +119,33 @@ class Base : public SimObject
     virtual std::shared_ptr<ReplacementData> instantiateEntry() = 0;
 
     virtual void copyCount(const std::shared_ptr<ReplacementData>&
-        replacement_data,int next_value_count[4])
-                const = 0;
+        replacement_data,int ** next_value_count, int set_no)
+                const {
+
+                }
 
     virtual ReplaceableEntry* getVictimSC(const ReplacementCandidates&
                                         candidates, int sc_head)
-                                            const = 0;
+                                            const {
+                                             return nullptr;
+                                            }
 
     virtual void updateCount(const ReplacementCandidates& candidates,
         int index)
-            const = 0;
+            const {
+
+            }
+
+    virtual void updateSCMCFlags(const std::shared_ptr<ReplacementData>&
+              replacement_data,bool SC)
+                            const {
+
+                            }
+
+    virtual bool getSCFlag(const std::shared_ptr<ReplacementData>&
+                        replacement_data) const {
+                         return false;
+                        }
 
 };
 

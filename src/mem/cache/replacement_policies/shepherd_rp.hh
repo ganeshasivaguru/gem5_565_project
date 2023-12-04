@@ -89,6 +89,7 @@ class Shepherd : public Base
      */
     void invalidate(const std::shared_ptr<ReplacementData>& replacement_data)
                                                                     override;
+    //void invalidate(const std::shared_ptr<ReplacementData>& )
 
     /**
      * Touch an entry to update its replacement data.
@@ -105,9 +106,11 @@ class Shepherd : public Base
      *
      * @param replacement_data Replacement data to be reset.
      */
-    void reset(const std::shared_ptr<ReplacementData>& replacement_data) const
-                                                                     override;
+    void reset(const std::shared_ptr<ReplacementData>& replacement_data
+              ) const override;
 
+    void resetCount(const std::shared_ptr<ReplacementData>& replacement_data,
+                int index) const override;
     /**
      * Find replacement victim using LRU timestamps.
      *
@@ -134,10 +137,16 @@ class Shepherd : public Base
      * Function to update the count[4]
     */
    void copyCount(const std::shared_ptr<ReplacementData>& replacement_data,
-                    int next_value_count[4]) const override;
+                    int ** next_value_count, int set_no) const override;
 
   void updateCount(const ReplacementCandidates& candidates,
                                 int index) const override;
+
+  void updateSCMCFlags(const std::shared_ptr<ReplacementData>&
+              replacement_data,bool SC) const override;
+
+  bool getSCFlag(const std::shared_ptr<ReplacementData>&
+                        replacement_data) const override;
 
 };
 

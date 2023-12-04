@@ -57,7 +57,7 @@ ShepherdTags::ShepherdTags(const Params &p)
     :BaseTags(p), allocAssoc(p.assoc), blks(p.size / p.block_size),
      sequentialAccess(p.sequential_access),
      replacementPolicy(p.replacement_policy),
-     numSets(p.size / (p.entry_size * p.assoc))
+     numSets(p.size / (p.block_size * p.assoc))
 {
     // There must be a indexing policy
     fatal_if(!p.indexing_policy, "An indexing policy is required");
@@ -67,6 +67,8 @@ ShepherdTags::ShepherdTags(const Params &p)
         fatal("Block size must be at least 4 and a power of 2");
     }
 
+    printf("numSets=%d\n",numSets);
+    //printf("")
     //next_value_count = new std::vector<std::array<int,4>>
     // Initialize sc_queue, next_sc_queue and next_value_count
     next_value_count = new int*[numSets];
@@ -104,7 +106,7 @@ ShepherdTags::tagsInit()
         const std::lldiv_t result = std::div((long long)blk_index, allocAssoc);
         const uint32_t set = result.quot;
         const uint32_t way = result.rem;
-
+        printf("Tags:init: Block set no is : %d\n", blk->getSet());
 
         // Associate a data chunk to the block
         blk->data = &dataBlks[blkSize*blk_index];
@@ -112,20 +114,28 @@ ShepherdTags::tagsInit()
         // Associate a replacement data entry to the block
         blk->replacementData = replacementPolicy->instantiateEntry();
         if (way >= allocAssoc - 4) { // IS SC entries
+
             //sc_queue[set][way - (allocAssoc - 4)] = blk;
-            (blk->replacementData)->isSC = true;
-            blk->replacementData.isMC = false;
+            // (blk->replacementData)->isSC = true;
+            // blk->replacementData.isMC = false;
+
+            replacementPolicy->updateSCMCFlags(blk->replacementData,true);
+
             if (!blk->isValid()) // INVALID block's count set to INT_MAX
                                 // so that it gets evicted first.
-                blk->replacementData.count[way-(allocAssoc-4)] = INT_MAX;
-
+                replacementPolicy->invalidate(blk->replacementData);
+                //blk->replacementData.count[way-(allocAssoc-4)] = INT_MAX;
         } else { // IS MC entries
-            blk->replacementData->isSC = false;
-            blk->replacementData->isMC = true;
+            //blk->replacementData->isSC = false;
+            //blk->replacementData->isMC = true;
+
+            replacementPolicy->updateSCMCFlags(blk->replacementData,false);
+
             if (!blk->isValid()) {
-                for (int i=0; i<4; i++) {
+                /*for (int i=0; i<4; i++) {
                     blk->replacementData->count[i] = INT_MAX:
-                }
+                }*/
+                replacementPolicy->invalidate(blk->replacementData);
             }
 
         }

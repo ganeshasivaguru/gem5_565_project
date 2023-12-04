@@ -72,16 +72,25 @@ Shepherd::touch(const std::shared_ptr<ReplacementData>& replacement_data) const
 
 void
 Shepherd::copyCount(const std::shared_ptr<ReplacementData>& replacement_data,
-                                            int next_value_count[4]) const
+                                            int ** next_value_count,
+                                            int set_no) const
 {
       for (int i=0; i<4; i++) {
         if (std::static_pointer_cast<ShepherdReplData>(
-            replacement_data)->count[i] == -1)
-        std::static_pointer_cast<ShepherdReplData>(
-            replacement_data)->count[i] = next_value_count[i];
+            replacement_data)->count[i] == -1) {
+
+          if (next_value_count[set_no][i] != -1) {
+                //meaning there is some SC entry
+
+                // Copy it to the count[i]
+                std::static_pointer_cast<ShepherdReplData>(
+                replacement_data)->count[i] = next_value_count[set_no][i];
+                // Increment the next value count
+                next_value_count[set_no][i]++;
+          }
+        }
     }
 }
-
 
 void
 Shepherd::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
@@ -89,6 +98,32 @@ Shepherd::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
     // Set last touch timestamp
     std::static_pointer_cast<ShepherdReplData>(
         replacement_data)->lastTouchTick = curTick();
+}
+
+void
+Shepherd::resetCount(const std::shared_ptr<ReplacementData>& replacement_data,
+                int index=-1) const
+{
+    // Set last touch timestamp
+    std::static_pointer_cast<ShepherdReplData>(
+        replacement_data)->lastTouchTick = curTick();
+
+    // default value of index is -1 so that when case of MC is passed
+    // we don't need to compare index.
+    for (int i=0; i<4; i++) {
+        if (std::static_pointer_cast<ShepherdReplData>(
+            replacement_data)->isSC && i!=index) {
+                // This is the case where the added block is
+                // in SC.
+                // Here other than count[index] all other
+                // counts should be 0;
+                std::static_pointer_cast<ShepherdReplData>(
+                    replacement_data)->count[i]=0;
+            } else {
+                std::static_pointer_cast<ShepherdReplData>(
+                replacement_data)->count[i] = -1;
+        }
+    }
 }
 
 ReplaceableEntry*
@@ -177,6 +212,25 @@ void Shepherd::updateCount(const ReplacementCandidates& candidates,
         std::static_pointer_cast<ShepherdReplData>(
             candidate->replacementData)->count[index] = -1;
     }
+}
+
+void Shepherd::updateSCMCFlags(const std::shared_ptr<ReplacementData>&
+              replacement_data,bool SC) const
+{
+    /* This function updates the SC and MC flag of the replacement_data*/
+    std::static_pointer_cast<ShepherdReplData>(
+                    replacement_data)->isSC = SC;
+
+    std::static_pointer_cast<ShepherdReplData>(
+                    replacement_data)->isMC = !SC;
+
+}
+
+bool Shepherd::getSCFlag(const std::shared_ptr<ReplacementData>&
+                        replacement_data) const
+{
+    return std::static_pointer_cast<ShepherdReplData>(
+                        replacement_data)->isSC;
 }
 
 } // namespace replacement_policy
