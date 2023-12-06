@@ -231,8 +231,7 @@ class ShepherdTags : public BaseTags
         // Logic to get the sc_head;
         //printf("getting victim before set_no");
         int set_no = (static_cast<CacheBlk*>(entries.front()))->getSet();
-        printf("--------------Entering findVictim for set no:%d--------
-        --------\n"
+        printf("--------------Entering findVictim for set no:%d----------\n"
         ,set_no);
         //printf("Set_no in find_victim:%d\n",set_no);
         //printf("got the set_no:%d \n",set_no);
@@ -262,8 +261,8 @@ class ShepherdTags : public BaseTags
     {
         // Insert block
         //BaseTags::insertBlock(pkt, blk);
-        printf("------Entered insert block for set no:%d and victim way:
-        %d -------\n",blk->getSet(),blk->getWay());
+        printf("------Entered insertBlock set no:%d victim way:%d-------\n",
+        blk->getSet(),blk->getWay());
         bool victim_in_sc = false;
         int set_no = blk->getSet();
         const std::vector<ReplaceableEntry*> entries =
@@ -356,8 +355,8 @@ class ShepherdTags : public BaseTags
                 replacementPolicy->resetCount(blk->replacementData,index);
                 //printf("Blk info:isValid=%d\n",blk->isValid());
 
-                printf("Invalid SC entry filled in set no: %dand NVC reset for
-                 \n",blk->getSet());
+                printf("Invalid SC entry filled in set no: %d\n",
+                blk->getSet());
                 //printf("")
                 printf(" Reset nvc for this set no:%d is\n",set);
 
@@ -369,8 +368,8 @@ class ShepherdTags : public BaseTags
         }
           // Increment tag counter
         stats.tagsInUse++;
-        printf("------------Exited insertBlock after inserting element
-        in set_no:%d------\n",blk->getSet());
+        printf("------Exited insertBlock after insert set_no:%d------\n"
+        ,blk->getSet());
 
         // Update replacement policy
     }
