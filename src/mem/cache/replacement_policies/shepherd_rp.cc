@@ -76,6 +76,9 @@ Shepherd::copyCount(const std::shared_ptr<ReplacementData>& replacement_data,
                                             int set_no) const
 {
       for (int i=0; i<4; i++) {
+        printf("[Set No: %d] Count[%d] before update is %d",set_no,i,
+        std::static_pointer_cast<ShepherdReplData>(
+            replacement_data)->count[i]);
         if (std::static_pointer_cast<ShepherdReplData>(
             replacement_data)->count[i] == -1) {
 
@@ -86,10 +89,16 @@ Shepherd::copyCount(const std::shared_ptr<ReplacementData>& replacement_data,
                 std::static_pointer_cast<ShepherdReplData>(
                 replacement_data)->count[i] = next_value_count[set_no][i];
                 // Increment the next value count
-                next_value_count[set_no][i]++;
+                next_value_count[set_no][i]= next_value_count[set_no][i] + 1;
           }
         }
+        printf("[Set No: %d] Count[%d] after update is %d",set_no,i,
+        std::static_pointer_cast<ShepherdReplData>(
+            replacement_data)->count[i]);
+        printf("[Set No:%d]UpdatedNVC inside CopyCount is %d:",
+        set_no,next_value_count[set_no][i]);
     }
+    printf("\n");
 }
 
 void
@@ -111,8 +120,8 @@ Shepherd::resetCount(const std::shared_ptr<ReplacementData>& replacement_data,
     // default value of index is -1 so that when case of MC is passed
     // we don't need to compare index.
     for (int i=0; i<4; i++) {
-        if (std::static_pointer_cast<ShepherdReplData>(
-            replacement_data)->isSC && i!=index) {
+            if (std::static_pointer_cast<ShepherdReplData>(
+            replacement_data)->isSC && i<index) {
                 // This is the case where the added block is
                 // in SC.
                 // Here other than count[index] all other
@@ -122,7 +131,10 @@ Shepherd::resetCount(const std::shared_ptr<ReplacementData>& replacement_data,
             } else {
                 std::static_pointer_cast<ShepherdReplData>(
                 replacement_data)->count[i] = -1;
-        }
+            }
+        printf("Reseting value of count[%d]:%d\n",i,
+        std::static_pointer_cast<ShepherdReplData>(
+                replacement_data)->count[i]);
     }
 }
 
@@ -190,9 +202,11 @@ Shepherd::getVictimSC(const ReplacementCandidates& candidates, int sc_head)
     }
     if (has_e_entry) {
         // USE LRU policy
+        printf("Used LRU policy\n");
         return victim;
     } else {
         // USE shepherd policy
+        printf("Used shepherd Policy\n");
         return sc_victim;
     }
 }

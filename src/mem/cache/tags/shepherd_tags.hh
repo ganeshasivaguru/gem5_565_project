@@ -178,10 +178,28 @@ class ShepherdTags : public BaseTags
             // What this does is to check if nvc[set_no][i]!=-1
             // and count[i]=-1 and copies nvc[set_no][i] to count[i]
             // and then increments nvc[set_no][i]
+            int scWayNo;
+            if (replacementPolicy->getSCFlag(blk->replacementData)) {
+               scWayNo = 4-(allocAssoc - blk->getWay());
+            }
             replacementPolicy->copyCount(blk->replacementData,
                                           next_value_count,set_no);
+
             //printf("Shepherd Touch happened");
 
+            if (replacementPolicy->getSCFlag(blk->replacementData)) {
+                printf("Touched an SC entry Set_no:%d , Way_no:%d\n",
+                blk->getSet(),blk->getWay());
+
+                for (int i=0; i<4; i++) {
+                    printf("NVC is:%d",next_value_count[set_no][i]);
+                }
+                printf("\n");
+                //printf("count of the touched set is:%d")
+            } else {
+                printf("Touched an MC entry Set_no:%d , Way_no:%d\n",
+                blk->getSet(),blk->getWay());
+            }
 
         }
 
@@ -213,18 +231,23 @@ class ShepherdTags : public BaseTags
         // Logic to get the sc_head;
         //printf("getting victim before set_no");
         int set_no = (static_cast<CacheBlk*>(entries.front()))->getSet();
-        printf("Set_no in find_victim:%d\n",set_no);
-        printf("got the set_no:%d \n",set_no);
+        printf("--------------Entering findVictim for set no:%d--------
+        --------\n"
+        ,set_no);
+        //printf("Set_no in find_victim:%d\n",set_no);
+        //printf("got the set_no:%d \n",set_no);
         int sc_head = next_sc_queue[set_no];
-        printf("sc_head for this replacement is %d\n",sc_head);
+        //printf("sc_head for this replacement is %d\n",sc_head);
         // Choose replacement victim from replacement candidates
         CacheBlk* victim = static_cast<CacheBlk*>
                             (replacementPolicy->getVictimSC(
                                 entries,sc_head));
-        printf("Exiting victimSC\n");
+        //printf("Exiting victimSC\n");
         // There is only one eviction for this replacement
         evict_blks.push_back(victim);
 
+        printf("----------Exiting findVictim for set no:%d-----------\n"
+        , set_no);
         return victim;
     }
 
@@ -239,7 +262,8 @@ class ShepherdTags : public BaseTags
     {
         // Insert block
         //BaseTags::insertBlock(pkt, blk);
-        printf("Entered insert block \n");
+        printf("------Entered insert block for set no:%d and victim way:
+        %d -------\n",blk->getSet(),blk->getWay());
         bool victim_in_sc = false;
         int set_no = blk->getSet();
         const std::vector<ReplaceableEntry*> entries =
@@ -266,6 +290,8 @@ class ShepherdTags : public BaseTags
                 // reset the NVC according to the victim_index to 0
                 next_value_count[set_no][victim_index] = 0;// nvc is reset
 
+                 printf("resetting NVC\n");
+
                 // Getting all the entries in the set.
                 // update the count[victim_index] of all entries in the
                 // cache to e
@@ -291,6 +317,7 @@ class ShepherdTags : public BaseTags
                 BaseTags::insertBlock(pkt,sc_head);
                 printf("Move block successful\n");
                 next_value_count[set_no][victim_index] = 0;
+                printf("resetting NVC\n");
 
                 // update the count[victim_index] of all entries
                 //in the cache to 0
@@ -306,30 +333,44 @@ class ShepherdTags : public BaseTags
             if (!replacementPolicy->getSCFlag(blk->replacementData)){ //Is MC
 
                 BaseTags::insertBlock(pkt,blk);
+                printf("Validity of block at set_no:%d and way_no:%d is %d",
+                blk->getSet(),blk->getWay(),blk->isValid());
                 // The reset function is modified to set count[i] to -1;
                 replacementPolicy->resetCount(blk->replacementData,-1);
 
-                /*for (int i=0; i<4; i++)  {
-                    blk->replacementData.count[i] = -1;
-                }*/
 
             } else { // invalid entry in SC that gets filled.
-                int index = allocAssoc - (blk->getWay());
+                printf("Invalid entry in SC filled. isSC:%d",
+                replacementPolicy->getSCFlag(blk->replacementData));
+                int index = 4 - (allocAssoc - (blk->getWay()));
+                printf("Index is:%d way is %d",blk->getWay(),index);
+
+                int set = blk->getSet();
                 BaseTags::insertBlock(pkt,blk);
+                printf("Validity of block at set_no:%d and way_no:%d is %d",
+                blk->getSet(),blk->getWay(),blk->isValid());
+
+                next_value_count[set][index] = 0;
+                printf("resetting NVC\n");
                 replacementPolicy->updateCount(entries,index);
                 replacementPolicy->resetCount(blk->replacementData,index);
-                /*for (int i=0;i<4;i++) {
-                    if (i==index){
-                        blk->replacementData.count[i] = -1
-                    } else {
-                        blk->replacementData.count[i] = 0;
-                    }
-               }*/
+                //printf("Blk info:isValid=%d\n",blk->isValid());
+
+                printf("Invalid SC entry filled in set no: %dand NVC reset for
+                 \n",blk->getSet());
+                //printf("")
+                printf(" Reset nvc for this set no:%d is\n",set);
+
+                for (int i=0;i<4;i++) {
+                    printf("%d",next_value_count[set][i]);
+
+               }
             }
         }
           // Increment tag counter
         stats.tagsInUse++;
-        printf("Exited insertBlock\n");
+        printf("------------Exited insertBlock after inserting element
+        in set_no:%d------\n",blk->getSet());
 
         // Update replacement policy
     }

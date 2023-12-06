@@ -93,6 +93,7 @@ void
 ShepherdTags::tagsInit()
 {
     // Initialize all blocks
+    //printf("Associativity=%d",allocAssoc);
     for (unsigned blk_index = 0; blk_index < numBlocks; blk_index++) {
         // Locate next cache block
         CacheBlk* blk = &blks[blk_index];
@@ -101,12 +102,14 @@ ShepherdTags::tagsInit()
         // Link block to indexing policy
         indexingPolicy->setEntry(blk, blk_index);
 
+        printf("Set no is %d Way no is %d\n", blk->getSet(), blk->getWay());
+
         /* GVS*/
         /* Trying to allocate sc_queue to the last 4 blocks in a set*/
         const std::lldiv_t result = std::div((long long)blk_index, allocAssoc);
         const uint32_t set = result.quot;
         const uint32_t way = result.rem;
-        printf("Tags:init: Block set no is : %d\n", blk->getSet());
+//        printf("Tags:init: Block set no is : %d\n", blk->getSet());
 
         // Associate a data chunk to the block
         blk->data = &dataBlks[blkSize*blk_index];
