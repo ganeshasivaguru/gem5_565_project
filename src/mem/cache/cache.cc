@@ -624,6 +624,7 @@ Cache::handleAtomicReqMiss(PacketPtr pkt, CacheBlk *&blk,
                 // the write to a whole line
                 const bool allocate = allocOnFill(pkt->cmd) &&
                     (!writeAllocator || writeAllocator->allocate());
+                printf("1:HandleFill called");
                 blk = handleFill(bus_pkt, blk, writebacks, allocate);
                 assert(blk != NULL);
                 is_invalidate = false;
@@ -632,6 +633,7 @@ Cache::handleAtomicReqMiss(PacketPtr pkt, CacheBlk *&blk,
                        bus_pkt->cmd == MemCmd::UpgradeResp) {
                 // we're updating cache state to allow us to
                 // satisfy the upstream request from the cache
+                printf("2:HandleFill called");
                 blk = handleFill(bus_pkt, blk, writebacks,
                                  allocOnFill(pkt->cmd));
                 satisfyRequest(pkt, blk);

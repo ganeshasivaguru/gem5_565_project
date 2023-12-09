@@ -109,7 +109,6 @@ ShepherdTags::tagsInit()
         const std::lldiv_t result = std::div((long long)blk_index, allocAssoc);
         const uint32_t set = result.quot;
         const uint32_t way = result.rem;
-//        printf("Tags:init: Block set no is : %d\n", blk->getSet());
 
         // Associate a data chunk to the block
         blk->data = &dataBlks[blkSize*blk_index];
@@ -118,28 +117,28 @@ ShepherdTags::tagsInit()
         blk->replacementData = replacementPolicy->instantiateEntry();
         if (way >= allocAssoc - 4) { // IS SC entries
 
-            //sc_queue[set][way - (allocAssoc - 4)] = blk;
-            // (blk->replacementData)->isSC = true;
-            // blk->replacementData.isMC = false;
 
             replacementPolicy->updateSCMCFlags(blk->replacementData,true);
 
-            if (!blk->isValid()) // INVALID block's count set to INT_MAX
-                                // so that it gets evicted first.
-                replacementPolicy->invalidate(blk->replacementData);
-                //blk->replacementData.count[way-(allocAssoc-4)] = INT_MAX;
+            // Updating the last inserted tick --
+            (the time at which block is inserted)
+            replacementPolicy->updatelastInsertTick(blk->replacementData);
+
+            // Update SC index
+            replacementPolicy->updateSCindex(
+                blk->replacementData,4-(allocAssoc-way));
+
+            printf("blocks's SC flag is:%d\n",
+            replacementPolicy->getSCFlag(blk->replacementData));
+
         } else { // IS MC entries
-            //blk->replacementData->isSC = false;
-            //blk->replacementData->isMC = true;
+
 
             replacementPolicy->updateSCMCFlags(blk->replacementData,false);
 
-            if (!blk->isValid()) {
-                /*for (int i=0; i<4; i++) {
-                    blk->replacementData->count[i] = INT_MAX:
-                }*/
-                replacementPolicy->invalidate(blk->replacementData);
-            }
+            // Updating the last inserted tick --
+            (the time at which block is inserted)
+            replacementPolicy->updatelastInsertTick(blk->replacementData);
 
         }
     }

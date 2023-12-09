@@ -54,10 +54,13 @@ class Shepherd : public Base
     {
         /** Tick on which the entry was last touched. */
         Tick lastTouchTick;
+        Tick lastInsertTick;                          //used to track SC Head
         // To be used when SC's OPT is unable to find the replacement candidate
 
         /** A counter for each SC entry to track the access*/
         int count[4];
+        int sc_index;
+        //used to track the index of count matrices
 
         /** Flags to indicate if the entry if a SC entry or a MC entry*/
         bool isSC;
@@ -68,10 +71,11 @@ class Shepherd : public Base
         /**
          * Default constructor. Invalidate data.
          */
-        ShepherdReplData() : isSC(0), isMC(0), lastTouchTick(0) {
-          for (int j=0; j<4; j++) {
+        ShepherdReplData() : isSC(0),
+        isMC(0), lastTouchTick(0), lastInsertTick(0) {
+         for (int j=0; j<4; j++) {
             count[j] = -1; // -1 equals "e" in the paper
-          }
+         }
         }
     };
 
@@ -147,6 +151,21 @@ class Shepherd : public Base
 
   bool getSCFlag(const std::shared_ptr<ReplacementData>&
                         replacement_data) const override;
+
+  ReplaceableEntry* getSChead(const ReplacementCandidates& candidates)
+                const override;
+
+  void updatelastInsertTick(const std::shared_ptr<ReplacementData>&
+              replacement_data) const override;
+
+  int getSCindex(const std::shared_ptr<ReplacementData>&
+              replacement_data) const override;
+
+  void updateSCindex(const std::shared_ptr<ReplacementData>&
+              replacement_data, int new_sc_index) const override;
+
+  bool hasEentry(const std::shared_ptr<ReplacementData>&
+                replacement_data, int index) const override;
 
 };
 

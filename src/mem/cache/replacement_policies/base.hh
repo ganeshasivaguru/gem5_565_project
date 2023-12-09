@@ -147,6 +147,31 @@ class Base : public SimObject
                          return false;
                         }
 
+    virtual ReplaceableEntry* getSChead(const ReplacementCandidates&
+                            candidates) const {
+
+                        }
+
+    virtual void updatelastInsertTick(const
+                    std::shared_ptr<ReplacementData>&
+              replacement_data) const {
+
+                        }
+
+    virtual int getSCindex(const std::shared_ptr<ReplacementData>&
+              replacement_data) const {
+              }
+
+    virtual void updateSCindex(const std::shared_ptr<ReplacementData>&
+              replacement_data, int new_sc_index) const {
+
+              }
+
+    virtual bool hasEentry(const std::shared_ptr<ReplacementData>&
+                replacement_data, int index) const {
+                    return false;
+                }
+
 };
 
 } // namespace replacement_policy

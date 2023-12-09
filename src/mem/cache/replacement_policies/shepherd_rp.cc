@@ -54,11 +54,7 @@ Shepherd::invalidate(const std::shared_ptr<ReplacementData>& replacement_data)
     std::static_pointer_cast<ShepherdReplData>(
         replacement_data)->lastTouchTick = Tick(0);
 
-    // When a cache blk is invalidated -- we set all count to INT_MAX
-    for (int i=0; i<4; i++) {
-        std::static_pointer_cast<ShepherdReplData>(
-            replacement_data)->count[i] = INT_MAX;
-    }
+    printf("Entering invalid -- SUSPICIOUS\n");
 }
 
 void
@@ -76,27 +72,27 @@ Shepherd::copyCount(const std::shared_ptr<ReplacementData>& replacement_data,
                                             int set_no) const
 {
       for (int i=0; i<4; i++) {
-        printf("[Set No: %d] Count[%d] before update is %d",set_no,i,
-        std::static_pointer_cast<ShepherdReplData>(
-            replacement_data)->count[i]);
+
         if (std::static_pointer_cast<ShepherdReplData>(
             replacement_data)->count[i] == -1) {
 
           if (next_value_count[set_no][i] != -1) {
                 //meaning there is some SC entry
+                printf("[Set No: %d] Count[%d] before update is %d\n",set_no,i,
+                            std::static_pointer_cast<ShepherdReplData>(
+                                                replacement_data)->count[i]);
 
                 // Copy it to the count[i]
                 std::static_pointer_cast<ShepherdReplData>(
                 replacement_data)->count[i] = next_value_count[set_no][i];
                 // Increment the next value count
                 next_value_count[set_no][i]= next_value_count[set_no][i] + 1;
+                printf("[Set No: %d] Count[%d] after update is %d\n",set_no,i,
+                        std::static_pointer_cast<ShepherdReplData>(
+                            replacement_data)->count[i]);
           }
         }
-        printf("[Set No: %d] Count[%d] after update is %d",set_no,i,
-        std::static_pointer_cast<ShepherdReplData>(
-            replacement_data)->count[i]);
-        printf("[Set No:%d]UpdatedNVC inside CopyCount is %d:",
-        set_no,next_value_count[set_no][i]);
+
     }
     printf("\n");
 }
@@ -121,7 +117,7 @@ Shepherd::resetCount(const std::shared_ptr<ReplacementData>& replacement_data,
     // we don't need to compare index.
     for (int i=0; i<4; i++) {
             if (std::static_pointer_cast<ShepherdReplData>(
-            replacement_data)->isSC && i<index) {
+            replacement_data)->isSC && i != index) {
                 // This is the case where the added block is
                 // in SC.
                 // Here other than count[index] all other
@@ -169,13 +165,12 @@ Shepherd::getVictimSC(const ReplacementCandidates& candidates, int sc_head)
     // There must be atleast one replacement candidate
     assert(candidates.size() > 0);
 
-    int has_e_entry;
+    int has_e_entry=0;
 
     ReplaceableEntry* victim = candidates[0];
     ReplaceableEntry* sc_victim = candidates[0];
 
     for (const auto& candidate : candidates) {
-
         if (std::static_pointer_cast<ShepherdReplData>(candidate
         ->replacementData)->count[sc_head] == -1) {
             has_e_entry=1;
@@ -187,10 +182,6 @@ Shepherd::getVictimSC(const ReplacementCandidates& candidates, int sc_head)
                 victim = candidate;
 
             }
-        } else if (std::static_pointer_cast<ShepherdReplData>(candidate
-           ->replacementData)->count[sc_head] == INT_MAX) {
-            return candidate;
-            // If any invalid block --> return that as the victim;
         } else {
             if (std::static_pointer_cast<ShepherdReplData>(
                 candidate->replacementData)->count[sc_head] >
@@ -200,13 +191,14 @@ Shepherd::getVictimSC(const ReplacementCandidates& candidates, int sc_head)
                 }
         }
     }
+    printf("Value of has_e_entry:%d",has_e_entry);
     if (has_e_entry) {
         // USE LRU policy
         printf("Used LRU policy\n");
         return victim;
     } else {
         // USE shepherd policy
-        printf("Used shepherd Policy\n");
+        printf("Used SC Policy\n");
         return sc_victim;
     }
 }
@@ -247,5 +239,80 @@ bool Shepherd::getSCFlag(const std::shared_ptr<ReplacementData>&
                         replacement_data)->isSC;
 }
 
+ReplaceableEntry* Shepherd::getSChead(const ReplacementCandidates&
+                                candidates) const
+{
+    // This function makes the count[index] to "e(aka -1)" for all
+    // the elements of the set in picture.
+    ReplaceableEntry* sc_head;
+
+   for (const auto& candidate : candidates) {
+       if (std::static_pointer_cast<ShepherdReplData>(
+                    candidate->replacementData)->isSC) {
+            sc_head = candidate;
+            //setting first SC entry encountered as the reference
+            printf("Found SC head\n");
+            break;
+        }
+   }
+
+
+    for (const auto& candidate : candidates) {
+        if (std::static_pointer_cast<ShepherdReplData>(
+                    candidate->replacementData)->lastInsertTick <
+                std::static_pointer_cast<ShepherdReplData>(
+                    sc_head->replacementData)->lastInsertTick &&
+                    std::static_pointer_cast<ShepherdReplData>(
+                    candidate->replacementData)->isSC)
+        {
+                sc_head = candidate;
+        }
+    }
+
+ return sc_head;
+}
+
+void Shepherd::updatelastInsertTick(
+    const std::shared_ptr<ReplacementData>&
+              replacement_data) const
+{
+    /* This function updates the
+    LastInsertTick on an insertion for a cache blk*/
+    std::static_pointer_cast<ShepherdReplData>(
+                    replacement_data)->lastInsertTick = curTick();
+
+}
+
+int Shepherd::getSCindex(const std::shared_ptr<ReplacementData>&
+              replacement_data) const
+{
+    return std::static_pointer_cast<ShepherdReplData>(
+                        replacement_data)->sc_index;
+
+}
+
+
+void Shepherd::updateSCindex(const std::shared_ptr<ReplacementData>&
+              replacement_data, int new_sc_index) const
+
+{
+     std::static_pointer_cast<ShepherdReplData>(
+                        replacement_data)->sc_index = new_sc_index;
+
+}
+
+bool Shepherd::hasEentry(const std::shared_ptr<ReplacementData>&
+                replacement_data, int index) const
+
+{
+    if (std::static_pointer_cast<ShepherdReplData>(
+        replacement_data)->count[index] == -1)
+        return true;
+    else
+        return false;
+}
+
+
 } // namespace replacement_policy
+
 } // namespace gem5
